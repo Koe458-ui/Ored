@@ -68,6 +68,26 @@ ored-checkpoints/
     export/epoch_0020_step_00049140.pt
 ```
 
+### Cloudflare R2
+
+When `ORED_R2_ACCOUNT_ID`, `ORED_R2_ACCESS_KEY_ID` and `ORED_R2_SECRET_ACCESS_KEY`
+are set, checkpoint and dataset files go to the Cloudflare R2 buckets of the same
+names (`ored-checkpoints`, `ored-datasets`) instead of Supabase Storage. Object
+paths are identical, so the checkpoint rows in Postgres (which stay on Supabase)
+need no change. One R2 upload takes up to 5 GiB, so nothing is split.
+
+To move existing files, with both the `ORED_SB_*` and `ORED_R2_*` variables set:
+
+```
+ored-checkpoints migrate-to-r2 --dry-run   # list what would be copied
+ored-checkpoints migrate-to-r2             # copy, checking each checkpoint's sha256 against its row
+```
+
+The copy is safe to re-run: files already in R2 at the right size are skipped.
+Supabase Storage is left untouched; delete it by hand once R2 is in use.
+
+### Supabase Storage size limit
+
 Files larger than 45 MiB are stored as numbered parts next to their logical
 name (`best/epoch_0020_step_00049140.pt.part00000`, `.part00001`, ...), because
 the Supabase Free plan rejects any single object over 50 MB with `413
