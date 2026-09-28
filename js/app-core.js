@@ -721,7 +721,7 @@
   }
 
   async function galFetch(){
-    const{data:imgs,error}=await sb.from('artworks').select('*')
+    const{data:imgs,error}=await sb.from('artworks').select(DZ_ART_COLS)
       .eq('status','approved').eq('visibility','published').eq('kind',ART_KIND_ART)
       .order('created_at',{ascending:false});
     if(error) throw error;
