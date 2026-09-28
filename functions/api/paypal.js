@@ -22,12 +22,12 @@ async function makeOrder(env, user, { minor, currency, kind, plan, itemId, label
       intent: 'CAPTURE',
       purchase_units: [{
         reference_id: 'dz_' + Date.now(),
-        description: String(label || 'DigiArtz').slice(0, 127),
+        description: String(label || 'oredlab').slice(0, 127),
         custom_id: user.id,
         amount: { currency_code: currency, value: toValue(minor, currency) },
       }],
       application_context: {
-        brand_name: 'DigiArtz',
+        brand_name: 'oredlab',
         shipping_preference: 'NO_SHIPPING',
         user_action: 'PAY_NOW',
       },

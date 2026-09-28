@@ -900,7 +900,7 @@
     });
   });
 
-  var SITE_NAME = 'Digiartz';
+  var SITE_NAME = 'oredlab';
   var SITE_URL  = 'https://digiartz.net';
   function setMeta(selector, attr, value){
     var el = document.querySelector(selector);
@@ -940,7 +940,7 @@
       'name':art.name||'Untitled artwork',
       'description':desc,
       'url':url,
-      'creator':{'@type':'Organization','name':'DigiArtz'},
+      'creator':{'@type':'Organization','name':'oredlab'},
       'representativeOfPage':true
     });
   }

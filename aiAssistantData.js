@@ -1,5 +1,5 @@
 window.ZEO_DATA = {
-  welcomeMessage: "Hi, I'm Zeo — your DigiArtz assistant. Tell me what you need and I'll walk you through it one step at a time. Pick an option to begin.",
+  welcomeMessage: "Hi, I'm Zeo — your oredlab assistant. Tell me what you need and I'll walk you through it one step at a time. Pick an option to begin.",
 
   welcomeOptions: [
     { id: "helpCenter",  label: "🧭 Get Help" },
@@ -9,7 +9,7 @@ window.ZEO_DATA = {
   helpCenterMessage: "What do you need help with? Choose a topic and I'll ask a couple of quick questions to get you to the right answer.",
 
   categories: [
-    { id: "about",     icon: "💠", label: "About DigiArtz",        description: "What this place is and who made it.",       prompt: "What would you like to know about DigiArtz?" },
+    { id: "about",     icon: "💠", label: "About oredlab",        description: "What this place is and who made it.",       prompt: "What would you like to know about oredlab?" },
     { id: "navigation",icon: "🧭", label: "Getting Around",         description: "Find your way and reach any section.",       prompt: "What are you trying to find or reach?" },
     { id: "account",   icon: "🔑", label: "Account & Login",        description: "Sign up, log in, passwords, sign-out.",      prompt: "What's happening with your account?" },
     { id: "profile",   icon: "👤", label: "Profile & Customizing",  description: "Avatar, banner, bio, links, username.",      prompt: "What do you want to change on your profile?" },
@@ -25,15 +25,15 @@ window.ZEO_DATA = {
     { id: "policies",  icon: "⚖️", label: "Policies & Legal",       description: "Privacy and Terms.",                          prompt: "Which policy would you like a quick summary of?" },
     { id: "safety",    icon: "🚩", label: "Safety & Reporting",     description: "Report content, harassment, stolen art.",    prompt: "What safety issue can I help with?" },
     { id: "trouble",   icon: "🛠️", label: "Technical Problems",     description: "Loading, saving, and display issues.",       prompt: "What's going wrong?" },
-    { id: "contact",   icon: "✉️", label: "Contact a Human",        description: "Reach the DigiArtz team directly.",          prompt: "How would you like to reach us?" }
+    { id: "contact",   icon: "✉️", label: "Contact a Human",        description: "Reach the oredlab team directly.",          prompt: "How would you like to reach us?" }
   ],
 
   responses: {
     about: [
       {
-        question: "What is DigiArtz?",
+        question: "What is oredlab?",
         answer:
-`DigiArtz is a place for digital artists to share their work, build a portfolio and meet other artists.
+`oredlab is a place for digital artists to share their work, build a portfolio and meet other artists.
 
 • Browse art — characters, cars, landscapes and more
 • Create a free account to post your own work
@@ -43,16 +43,16 @@ window.ZEO_DATA = {
 Head to the Home tab any time to start exploring.`
       },
       {
-        question: "Who created DigiArtz?",
+        question: "Who created oredlab?",
         answer:
-`DigiArtz is built and run by the DigiArtz team.
+`oredlab is built and run by the oredlab team.
 
 It is a place for digital artists anywhere to put their work up and have people see it.`
       },
       {
         question: "Is it free to use?",
         answer:
-`Yes — DigiArtz is free to browse and to post your art.
+`Yes — oredlab is free to browse and to post your art.
 
 1. Tap Profile in the top bar
 2. Create a free account (or log in)
@@ -63,7 +63,7 @@ Optional paid subscription tiers add extra perks — see the "Subscriptions & Bi
       {
         question: "What can I do here?",
         answer:
-`Here's what you can do on DigiArtz:
+`Here's what you can do on oredlab:
 
 1. Browse art under Explore → Artworks
 2. Open any piece to download, share, like or comment
@@ -158,7 +158,7 @@ Or tap Google, Discord or Apple to sign in with that account.`
 1. Open Profile → Log In (or Sign Up)
 2. Tap the Google, Discord or Apple button
 3. Approve the sign-in in the pop-up
-4. You'll return to DigiArtz already logged in
+4. You'll return to oredlab already logged in
 
 If a button says it isn't enabled yet, try email sign-in for now.`
       },
@@ -510,7 +510,7 @@ Posts go live right away, cover image and all.`
       {
         question: "How do I comment on a post?",
         answer:
-`Open the post, scroll to the comments, then type and send. You'll need to be logged in. Keep it kind and constructive — same as everywhere on DigiArtz.`
+`Open the post, scroll to the comments, then type and send. You'll need to be logged in. Keep it kind and constructive — same as everywhere on oredlab.`
       }
     ],
 
@@ -614,7 +614,7 @@ Spam, MLM and pay-to-apply postings aren't allowed and get removed.`
       {
         question: "How does the Cart work?",
         answer:
-`DigiArtz keeps buying quick — there's no multi-item basket to fill. You buy a listing and it's yours immediately: free items download on tap, paid ones the moment checkout clears.
+`oredlab keeps buying quick — there's no multi-item basket to fill. You buy a listing and it's yours immediately: free items download on tap, paid ones the moment checkout clears.
 
 Your cart — the 🛒 in the top bar — is where those purchases, downloads and licences gather.`
       },
@@ -681,7 +681,7 @@ Starting a conversation adds them to your list automatically.`
       {
         question: "What is Zeo?",
         answer:
-`That's me! 🤖 I'm Zeo, the DigiArtz help assistant.
+`That's me! 🤖 I'm Zeo, the oredlab help assistant.
 
 • I guide you through common tasks step by step
 • Find me any time at the top of your Friends list
@@ -748,7 +748,7 @@ Read the full version any time from the footer → Privacy Policy.`
       {
         question: "Terms & Conditions (summary)",
         answer:
-`The Terms you agree to by using DigiArtz cover:
+`The Terms you agree to by using oredlab cover:
 
 1. Who can use the platform and account responsibilities
 2. That you keep ownership of your content (you grant us a licence to host/show it)
@@ -810,7 +810,7 @@ If you're ever in immediate danger offline, contact your local emergency service
         answer:
 `To report content that infringes your rights:
 
-1. Find the specific artwork on DigiArtz
+1. Find the specific artwork on oredlab
 2. Gather proof that the original is yours
 3. Send a notice to DigiArtzsupport@gmail.com with links and proof
 
@@ -825,7 +825,7 @@ We may remove infringing content and act on repeat offenders.`
 2. Log out of other devices where possible
 3. Email DigiArtzsupport@gmail.com from your registered email so we can help lock it down
 
-Never share your password — DigiArtz staff and I will never ask for it.`
+Never share your password — oredlab staff and I will never ask for it.`
       }
     ],
 
@@ -894,7 +894,7 @@ Details like these help us fix it fast.`
       {
         question: "Email support",
         answer:
-`You can reach the DigiArtz team by email:
+`You can reach the oredlab team by email:
 
 1. Write to DigiArtzsupport@gmail.com
 2. Include your username and a clear description
@@ -921,7 +921,7 @@ We'll get back to you as soon as we can.`
 2. Tell us who you are and what you have in mind
 3. Include any relevant links or references
 
-The DigiArtz team reviews every message.`
+The oredlab team reviews every message.`
       }
     ]
   },

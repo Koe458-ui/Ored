@@ -49,7 +49,7 @@
     ld.textContent = JSON.stringify({
       '@context':'https://schema.org',
       '@type':'ImageGallery',
-      'name':'Digiartz Gallery',
+      'name':'oredlab Gallery',
       'url':SITE_URL+'/',
       'image':images.slice(0,100).map(function(a){
         return {

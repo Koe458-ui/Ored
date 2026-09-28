@@ -59,48 +59,48 @@ const SECTIONS = {
   '/explore': {
     crumb: 'Explore',
     h1: 'Explore Digital Art',
-    title: 'Explore Digital Art — DigiArtz',
-    desc: 'Browse digital artwork from the DigiArtz community — character illustration, ' +
+    title: 'Explore Digital Art — oredlab',
+    desc: 'Browse digital artwork from the oredlab community — character illustration, ' +
           'fan art, concept art, landscapes, vehicles and original work from artists worldwide.',
     ld: 'CollectionPage'
   },
   '/marketplace': {
     crumb: 'Marketplace',
     h1: 'Marketplace — Buy and Sell Digital Art',
-    title: 'Marketplace — Buy and Sell Digital Art on DigiArtz',
-    desc: 'Buy and sell digital art and creative assets on DigiArtz: artwork, prints, ' +
+    title: 'Marketplace — Buy and Sell Digital Art on oredlab',
+    desc: 'Buy and sell digital art and creative assets on oredlab: artwork, prints, ' +
           'brushes, templates, UI kits, 3D models and commissions from independent artists.',
     ld: 'CollectionPage'
   },
   '/community': {
     crumb: 'Community',
     h1: 'Community',
-    title: 'Community — DigiArtz',
-    desc: 'Join the DigiArtz community. Talk with other digital artists, share work in ' +
+    title: 'Community — oredlab',
+    desc: 'Join the oredlab community. Talk with other digital artists, share work in ' +
           'progress, swap feedback and find people to collaborate with.',
     ld: 'CollectionPage'
   },
   '/resources': {
     crumb: 'Resources',
     h1: 'Resources for Digital Artists',
-    title: 'Resources for Digital Artists — DigiArtz',
-    desc: 'Resources for digital artists on DigiArtz: brushes, textures, fonts, references, ' +
+    title: 'Resources for Digital Artists — oredlab',
+    desc: 'Resources for digital artists on oredlab: brushes, textures, fonts, references, ' +
           'colour palettes, mockups, templates and tutorials shared by the community.',
     ld: 'CollectionPage'
   },
   '/blog': {
     crumb: 'Blog',
     h1: 'Blog — Tutorials and Artist Stories',
-    title: 'Blog — Tutorials and Artist Stories — DigiArtz',
-    desc: 'Tutorials, artist spotlights, interviews, reviews and news from the DigiArtz ' +
+    title: 'Blog — Tutorials and Artist Stories — oredlab',
+    desc: 'Tutorials, artist spotlights, interviews, reviews and news from the oredlab ' +
           'digital art community.',
     ld: 'CollectionPage'
   },
   '/login': {
     crumb: 'Login',
     h1: 'Login',
-    title: 'Login — DigiArtz',
-    desc: 'Sign in to your DigiArtz account to upload artwork, sell in the marketplace, ' +
+    title: 'Login — oredlab',
+    desc: 'Sign in to your oredlab account to upload artwork, sell in the marketplace, ' +
           'join communities and follow other artists.',
     ld: 'WebPage'
   }
@@ -213,13 +213,13 @@ function artworkMeta(row, artist) {
   const url  = `${SITE}/artwork/${row.id}`;
   const img  = ogImage(row.image_url) || '';
 
-  const title = by ? `${name} by ${by} — DigiArtz` : `${name} — DigiArtz`;
+  const title = by ? `${name} by ${by} — oredlab` : `${name} — oredlab`;
   const desc  = clamp(
     row.description ||
     [`${name} —`, by ? `digital artwork by ${by}` : 'digital artwork',
      row.category ? `in ${row.category}` : '',
      row.software ? `made in ${row.software}` : '',
-     'on DigiArtz.'].filter(Boolean).join(' ')
+     'on oredlab.'].filter(Boolean).join(' ')
   );
 
   const ld = {
@@ -244,11 +244,11 @@ function profileMeta(row) {
   const img  = ogImage(row.banner_url || row.avatar_url) || '';
 
   return {
-    title: `${name} — DigiArtz`,
-    desc: clamp(row.bio || `Digital artwork by ${name} on DigiArtz.`),
+    title: `${name} — oredlab`,
+    desc: clamp(row.bio || `Digital artwork by ${name} on oredlab.`),
     url,
     img,
-    imgAlt: `${name} on DigiArtz`,
+    imgAlt: `${name} on oredlab`,
     ogType: 'profile',
     h1: name,
     ld: {
@@ -284,7 +284,7 @@ function sectionMeta(path, sec) {
     desc: sec.desc,
     url,
     img: '',
-    imgAlt: `${sec.crumb} on DigiArtz`,
+    imgAlt: `${sec.crumb} on oredlab`,
     ogType: 'website',
     h1: sec.h1,
     ld: [
@@ -294,7 +294,7 @@ function sectionMeta(path, sec) {
         name: sec.title,
         description: sec.desc,
         url,
-        isPartOf: { '@type': 'WebSite', name: 'DigiArtz', url: `${SITE}/` }
+        isPartOf: { '@type': 'WebSite', name: 'oredlab', url: `${SITE}/` }
       },
       crumbs([{ name: sec.crumb, url }])
     ],
@@ -308,10 +308,10 @@ function itemMeta(seg, cfg, row) {
   const body = row.seo_description || row.summary || row.excerpt || row.description || '';
   const img = ogImage(row.preview_url || row.cover_url || '') || '';
   const date = (row.published_at || row.created_at || '').slice(0, 10);
-  const desc = clamp(body || `${name} — ${cfg.crumb.toLowerCase()} on DigiArtz.`);
+  const desc = clamp(body || `${name} — ${cfg.crumb.toLowerCase()} on oredlab.`);
   const title = seg === 'job' && row.company
-    ? `${name} at ${row.company} — DigiArtz`
-    : `${name} — DigiArtz`;
+    ? `${name} at ${row.company} — oredlab`
+    : `${name} — oredlab`;
 
   return {
     title,
@@ -330,7 +330,7 @@ function itemMeta(seg, cfg, row) {
         url,
         ...(date ? { datePublished: date } : {}),
         ...(img ? { image: img } : {}),
-        isPartOf: { '@type': 'WebSite', name: 'DigiArtz', url: `${SITE}/` }
+        isPartOf: { '@type': 'WebSite', name: 'oredlab', url: `${SITE}/` }
       },
       crumbs(cfg.parent
         ? [{ name: cfg.crumb, url: `${SITE}${cfg.parent}` }, { name, url }]
@@ -343,11 +343,11 @@ function itemMeta(seg, cfg, row) {
 function unlistedMeta(seg, cfg, id) {
   const url = `${SITE}/${seg}/${id}`;
   return {
-    title: `${cfg.crumb} — DigiArtz`,
-    desc: `${cfg.crumb} on DigiArtz.`,
+    title: `${cfg.crumb} — oredlab`,
+    desc: `${cfg.crumb} on oredlab.`,
     url,
     img: '',
-    imgAlt: 'DigiArtz',
+    imgAlt: 'oredlab',
     ogType: 'website',
     h1: cfg.crumb,
     robots: 'noindex, follow',
@@ -466,12 +466,12 @@ export async function onRequest(context) {
     const cards = arts.map((a) =>
       `<a class="awCard" href="/artwork/${esc(a.id)}"><div class="awImgWrap">` +
       `<img loading="lazy" decoding="async" ${thumbAttrs(a.image_url, env)} ` +
-      `alt="${esc(a.name)} — digital artwork on DigiArtz"></div></a>`
+      `alt="${esc(a.name)} — digital artwork on oredlab"></div></a>`
     ).join('');
 
     const galleryLd = JSON.stringify({
       '@context': 'https://schema.org', '@type': 'ImageGallery',
-      name: 'DigiArtz — Digital Art Gallery', url: `${SITE}/`,
+      name: 'oredlab — Digital Art Gallery', url: `${SITE}/`,
       hasPart: arts.map((a, i) => ({
         '@type': 'ImageObject', position: i + 1, name: a.name,
         contentUrl: fullImage(a.image_url), thumbnailUrl: thumb(a.image_url),

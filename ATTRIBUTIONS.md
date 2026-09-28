@@ -1,6 +1,6 @@
 # Attributions
 
-Third-party material used by DigiArtz, kept here so the source files stay
+Third-party material used by oredlab, kept here so the source files stay
 free of other people's names and URLs.
 
 ## Profanity word list

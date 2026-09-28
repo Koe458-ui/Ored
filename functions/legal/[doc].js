@@ -29,13 +29,13 @@ function page(slug, doc, navTitle) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(navTitle)} — DigiArtz</title>
+<title>${esc(navTitle)} — oredlab</title>
 <meta name="description" content="${esc(describe(doc.html))}">
 <link rel="canonical" href="${esc(url)}">
 <meta property="og:type" content="article">
-<meta property="og:title" content="${esc(navTitle)} — DigiArtz">
+<meta property="og:title" content="${esc(navTitle)} — oredlab">
 <meta property="og:url" content="${esc(url)}">
-<meta property="og:site_name" content="DigiArtz">
+<meta property="og:site_name" content="oredlab">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4" sizes="any">
 <link rel="icon" href="/favicon.ico?v=4">
 <style>
@@ -87,7 +87,7 @@ function page(slug, doc, navTitle) {
 <body>
   <div class="wrap">
     <header>
-      <a class="brand" href="/">DIGIARTZ</a>
+      <a class="brand" href="/">OREDLAB</a>
       <h1>${esc(navTitle)}</h1>
     </header>
     <main>${doc.html}</main>
@@ -95,7 +95,7 @@ function page(slug, doc, navTitle) {
       <p>Other policies</p>
       ${others}
     </nav>
-    <footer>© 2026 DigiArtz. Questions: <a href="mailto:DigiArtzsupport@gmail.com">DigiArtzsupport@gmail.com</a></footer>
+    <footer>© 2026 oredlab. Questions: <a href="mailto:DigiArtzsupport@gmail.com">DigiArtzsupport@gmail.com</a></footer>
   </div>
 </body>
 </html>`;

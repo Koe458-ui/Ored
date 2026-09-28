@@ -3,7 +3,7 @@
 
   var CHUNKS = {
     analytics: {
-      src: ['/js/analytics.js?v=23'],
+      src: ['/js/analytics.js?v=24'],
       css: ['/css/analytics.css?v=17'],
       api: ['openAnalyticsPage']
     },
@@ -13,7 +13,7 @@
       api: ['anHubOpen', 'payHubOpen']
     },
     share: {
-      src: ['/js/share.js?v=3'],
+      src: ['/js/share.js?v=4'],
       api: ['openPfShare', 'closePfShare', 'pfShareCopy', 'pfShareNative']
     },
     zeo: {
@@ -31,7 +31,7 @@
             'dzQuotaOpen', 'avLoadQuota', 'dzAdMount', 'dzAdHtml']
     },
     legal: {
-      src: ['/js/legal-content.js?v=4'],
+      src: ['/js/legal-content.js?v=5'],
       module: true,
       api: []
     }

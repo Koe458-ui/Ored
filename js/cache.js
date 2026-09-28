@@ -719,7 +719,7 @@
       var s = stats();
       s.disk = rows.length;
       try {
-        console.log('%cdigiartz cache', 'font-weight:bold');
+        console.log('%coredlab cache', 'font-weight:bold');
         console.table([s]);
         var byPolicy = {};
         rows.forEach(function (r) {

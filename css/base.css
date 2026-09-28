@@ -30,6 +30,7 @@
 
   --danger:#fca5a5;
   --brand-red:#EF4444;
+  --brand-orange:#F97316;
   --danger-strong:#dc2626;
   --danger-bg:rgba(220,38,38,.14);
   --danger-bg-hover:rgba(220,38,38,.24);
@@ -73,6 +74,7 @@ html[data-theme="offwhite"]{
 
   --danger:#B3261E;
   --brand-red:#DC2626;
+  --brand-orange:#EA580C;
   --danger-strong:#B3261E;
   --danger-bg:rgba(179,38,30,.08);
   --danger-bg-hover:rgba(179,38,30,.14);
@@ -290,8 +292,7 @@ body{
 .dzBrand:focus-visible,
 .dzLink:focus-visible{outline:2px solid var(--pg);outline-offset:3px;border-radius:6px;}
 .dzBrandD,.dzBrandA{-webkit-text-stroke:var(--sigInk) currentColor;}
-.dzBrandD{color:#0A0A0A;}
-html[data-theme="graydark"] .dzBrandD{color:var(--tx);}
+.dzBrandD{color:var(--brand-orange);}
 .dzBrandA{color:var(--brand-red);}
 
 .dzLinks{

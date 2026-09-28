@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="DigiArtz" shape-rendering="geometricPrecision">
-  <title>DigiArtz</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="oredlab" shape-rendering="geometricPrecision">
+  <title>oredlab</title>
   <defs>
     <linearGradient id="dzFace0" gradientUnits="userSpaceOnUse" x1="72" y1="248" x2="-72" y2="776">
       <stop offset="0" stop-color="#4a4a4a"/><stop offset="0.35" stop-color="#242424"/><stop offset="0.72" stop-color="#111111"/><stop offset="1" stop-color="#050505"/>

@@ -129,10 +129,10 @@ function svg({ size = 1024, scale = ICON, ground = 'square', shadowed = true, ti
 `;
 }
 
-const logoSvg = svg({ scale: ICON, ground: 'none', title: 'DigiArtz' });
-const iconSvg = svg({ scale: ICON, title: 'DigiArtz' });
-const tabSvg = svg({ scale: TAB, shadowed: false, title: 'DigiArtz' });
-const maskSvg = svg({ scale: SAFE, title: 'DigiArtz' });
+const logoSvg = svg({ scale: ICON, ground: 'none', title: 'oredlab' });
+const iconSvg = svg({ scale: ICON, title: 'oredlab' });
+const tabSvg = svg({ scale: TAB, shadowed: false, title: 'oredlab' });
+const maskSvg = svg({ scale: SAFE, title: 'oredlab' });
 
 writeFileSync(out('logo.svg'), logoSvg);
 writeFileSync(out('favicon.svg'), tabSvg);

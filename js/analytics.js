@@ -51,7 +51,7 @@
 
   var SOURCE_LABEL = {
     direct: 'Direct', social: 'Social media', search: 'Search engines',
-    referral: 'Referrals', internal: 'Within DigiArtz'
+    referral: 'Referrals', internal: 'Within oredlab'
   };
   var SOURCE_HEX = {
     direct: '#00A6FF', social: '#FF3DE0', search: '#00D9B8',
@@ -1494,7 +1494,7 @@
       return { label: m.label, n: cur, sub: full(cur) + ' vs ' + full(pv) + ' · ' + d.txt.replace(' on previous', '') };
     }));
 
-    var sCard = anCard(b, 'Against the rest of DigiArtz',
+    var sCard = anCard(b, 'Against the rest of oredlab',
       { stack: true, note: 'views over the same window' });
 
     var top = Math.max(Number(cmp.my_views) || 0, Number(cmp.median_views) || 0, Number(cmp.avg_views) || 0, 1);

@@ -2617,7 +2617,7 @@
   }
   function dzSeoTitle(title){
     var t = String(title || '').trim();
-    if(t.length < 10) t = (t + ' — DigiArtz').trim();
+    if(t.length < 10) t = (t + ' — oredlab').trim();
     t = t.slice(0, 70);
     return t.length >= 10 ? t : null;
   }

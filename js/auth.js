@@ -242,7 +242,7 @@
       var configured = !!(window.dzCaptcha && window.dzCaptcha.configured());
       if (!configured) {
         console.warn(
-          '[DigiArtz] Sign-in was refused for a missing captcha token, and no ' +
+          '[oredlab] Sign-in was refused for a missing captcha token, and no ' +
           'TURNSTILE_SITE_KEY is present in config.js. CAPTCHA protection is ' +
           'enabled in Supabase but the page cannot satisfy it, so sign-in and ' +
           'sign-up are broken for everyone. Either set TURNSTILE_SITE_KEY (and ' +
@@ -659,11 +659,11 @@
     return notifList.filter(function(n){ return !n.is_read; }).length;
   }
 
-  // an actor's face when a person did it, the site mark when DigiArtz did
+  // an actor's face when a person did it, the site mark when oredlab did
   function notifAvatar(n){
     if(!n.actor_id){
       // the site's own mark, on the URL the page already precaches
-      return '<img class="notifAv notifAv--site" src="/favicon.svg?v=4" alt="DigiArtz" loading="lazy" decoding="async">';
+      return '<img class="notifAv notifAv--site" src="/favicon.svg?v=4" alt="oredlab" loading="lazy" decoding="async">';
     }
     var letter = esc((n.actor_name||'?').charAt(0).toUpperCase());
     if(!n.actor_avatar) return '<span class="notifAv notifAv--txt">'+letter+'</span>';

@@ -1,10 +1,10 @@
 export const LEGAL = {
     privacy: {
       title: 'PRIVACY POLICY',
-      html: `<h2>DigiArtz Privacy Policy</h2>
+      html: `<h2>oredlab Privacy Policy</h2>
 <p><strong>Effective Date:</strong> 6 July 2026</p>
-<p>DigiArtz ("we," "us," "our") operates digiartz.net as an artist community platform. This Privacy Policy explains how we collect, use, store, share, and protect information when you use our website, services, and community features.</p>
-<p>By using DigiArtz, you agree to this Privacy Policy.</p>
+<p>oredlab ("we," "us," "our") operates digiartz.net as an artist community platform. This Privacy Policy explains how we collect, use, store, share, and protect information when you use our website, services, and community features.</p>
+<p>By using oredlab, you agree to this Privacy Policy.</p>
 <h3>1. Information We Collect</h3>
 <p>We may collect the following types of information:</p>
 <h4>Information you provide directly</h4>
@@ -49,7 +49,7 @@ export const LEGAL = {
 <ul>
 <li>Essential site functions</li>
 <li>Remembering preferences and login sessions</li>
-<li>Understanding how people use DigiArtz</li>
+<li>Understanding how people use oredlab</li>
 <li>Improving performance</li>
 <li>Advertising and ad measurement</li>
 </ul>
@@ -60,11 +60,11 @@ export const LEGAL = {
 <li>Service providers that help us run the website, host content, send emails, analyze traffic, or serve ads.</li>
 <li>Google and other advertising/analytics partners.</li>
 <li>Law enforcement, regulators, or other parties when required by law or when necessary to protect rights, safety, or security.</li>
-<li>Another organization if DigiArtz is involved in a merger, acquisition, reorganization, or sale of assets.</li>
+<li>Another organization if oredlab is involved in a merger, acquisition, reorganization, or sale of assets.</li>
 </ul>
 <p>We do not sell your personal information in the ordinary sense of the word, unless we clearly disclose a specific sale or sharing arrangement and the law requires a choice.</p>
 <h3>6. User Content</h3>
-<p>Anything you upload publicly on DigiArtz may be visible to other users and visitors.</p>
+<p>Anything you upload publicly on oredlab may be visible to other users and visitors.</p>
 <p>Please do not post anything you do not want others to see, copy, or share. Once content is shared publicly, it may be difficult or impossible to remove it completely from the internet.</p>
 <h3>7. Your Choices and Rights</h3>
 <p>Depending on where you live, you may have the right to:</p>
@@ -84,10 +84,10 @@ export const LEGAL = {
 <h3>9. Security</h3>
 <p>We use reasonable technical and organizational measures to help protect your information. No website or internet-based service can be fully secure, so we cannot guarantee absolute security.</p>
 <h3>10. Children's Privacy</h3>
-<p>DigiArtz is not intended for children under the age of 13, and in some places higher age limits may apply under local law.</p>
+<p>oredlab is not intended for children under the age of 13, and in some places higher age limits may apply under local law.</p>
 <p>If we learn that we have collected personal information from a child without appropriate consent, we will take steps to delete it.</p>
 <h3>11. International Users</h3>
-<p>If you access DigiArtz from outside the country where our servers or service providers are located, your information may be transferred and processed in other countries with different data protection rules.</p>
+<p>If you access oredlab from outside the country where our servers or service providers are located, your information may be transferred and processed in other countries with different data protection rules.</p>
 <h3>12. Third-Party Links and Services</h3>
 <p>Our website may contain links to other websites, embedded content, or third-party services. We are not responsible for the privacy practices of those third parties.</p>
 <h3>13. Changes to This Policy</h3>
@@ -99,11 +99,11 @@ export const LEGAL = {
     },
     terms: {
       title: 'TERMS &amp; CONDITIONS',
-      html: `<h2>DigiArtz Terms and Conditions</h2>
+      html: `<h2>oredlab Terms and Conditions</h2>
 <p><strong>Effective Date:</strong> 6 July 2026</p>
-<p>These Terms and Conditions ("Terms") govern your use of DigiArtz and all related pages, features, and services on digiartz.net.</p>
-<p>By using DigiArtz, you agree to these Terms. If you do not agree, do not use the website.</p>
-<h3>1. Who Can Use DigiArtz</h3>
+<p>These Terms and Conditions ("Terms") govern your use of oredlab and all related pages, features, and services on digiartz.net.</p>
+<p>By using oredlab, you agree to these Terms. If you do not agree, do not use the website.</p>
+<h3>1. Who Can Use oredlab</h3>
 <p>You must be legally able to enter into a binding agreement where you live. If you are under the minimum age required by law in your country, you may not use the service without appropriate permission from a parent or guardian, if allowed by law.</p>
 <h3>2. Accounts</h3>
 <p>If you create an account, you agree to:</p>
@@ -116,8 +116,8 @@ export const LEGAL = {
 <p>We may suspend or close accounts that violate these Terms or put the community at risk.</p>
 <h3>3. Your Content</h3>
 <p>You keep ownership of the content you create and upload.</p>
-<p>By posting content on DigiArtz, you give us a non-exclusive, worldwide, royalty-free, transferable, sublicensable license to host, store, reproduce, display, distribute, adapt, promote, and make technical changes to your content as needed to operate, improve, and promote the platform.</p>
-<p>This license ends when your content is removed from DigiArtz, except where:</p>
+<p>By posting content on oredlab, you give us a non-exclusive, worldwide, royalty-free, transferable, sublicensable license to host, store, reproduce, display, distribute, adapt, promote, and make technical changes to your content as needed to operate, improve, and promote the platform.</p>
+<p>This license ends when your content is removed from oredlab, except where:</p>
 <ul>
 <li>Other users have shared or re-posted it,</li>
 <li>We need to keep copies for legal, security, backup, or compliance reasons, or</li>
@@ -126,10 +126,10 @@ export const LEGAL = {
 <p>You are responsible for making sure you have the rights to post any artwork, images, text, music, fonts, or other material you upload.</p>
 <h3>4. Copyright and Intellectual Property</h3>
 <p>Do not upload content that violates someone else's copyright, trademark, privacy, or other rights.</p>
-<p>If you believe content on DigiArtz infringes your rights, contact us with a proper notice at DigiArtzsupport@gmail.com and include enough details for us to review the claim.</p>
+<p>If you believe content on oredlab infringes your rights, contact us with a proper notice at DigiArtzsupport@gmail.com and include enough details for us to review the claim.</p>
 <p>We may remove content, limit access, or disable accounts if we believe infringement or repeat infringement has occurred.</p>
 <h3>5. Community Rules</h3>
-<p>You agree not to use DigiArtz to:</p>
+<p>You agree not to use oredlab to:</p>
 <ul>
 <li>Post illegal, hateful, harassing, abusive, threatening, or defamatory content</li>
 <li>Upload spam, scams, malware, phishing links, or harmful code</li>
@@ -145,7 +145,7 @@ export const LEGAL = {
 <p>We may review, filter, edit, hide, move, or remove content if we believe it violates these Terms, our policies, or community standards.</p>
 <p>We are not obligated to monitor every post, but we may act when we become aware of a problem.</p>
 <h3>7. Advertising</h3>
-<p>DigiArtz may display advertisements, including Google ads and ads from other partners.</p>
+<p>oredlab may display advertisements, including Google ads and ads from other partners.</p>
 <p>We do not control every third-party advertisement, offer, or landing page. Clicking an ad is between you and the advertiser. Any deal, product, or service from a third party is governed by that third party's terms and privacy policy.</p>
 <h3>8. Third-Party Services</h3>
 <p>The website may use third-party services for analytics, hosting, payments, login, embeds, or advertising. We are not responsible for the actions or policies of those third parties.</p>
@@ -155,12 +155,12 @@ export const LEGAL = {
 <li>Use bots or automated systems to abuse the service</li>
 <li>Attempt to bypass access restrictions</li>
 <li>Copy or clone the site or its features without permission</li>
-<li>Use DigiArtz to distribute viruses, spam, or deceptive content</li>
+<li>Use oredlab to distribute viruses, spam, or deceptive content</li>
 <li>Collect user data without consent</li>
 <li>Use the service for unlawful commercial activities</li>
 </ul>
 <h3>10. Disclaimer</h3>
-<p>DigiArtz is provided on an "as is" and "as available" basis.</p>
+<p>oredlab is provided on an "as is" and "as available" basis.</p>
 <p>We do not promise that:</p>
 <ul>
 <li>The website will always be available, secure, or error-free</li>
@@ -169,14 +169,14 @@ export const LEGAL = {
 </ul>
 <p>Use the site at your own risk.</p>
 <h3>11. Limitation of Liability</h3>
-<p>To the fullest extent allowed by law, DigiArtz and its owners will not be liable for indirect, incidental, special, or consequential damages, including loss of data, profits, reputation, or business opportunities, arising from your use of the website.</p>
+<p>To the fullest extent allowed by law, oredlab and its owners will not be liable for indirect, incidental, special, or consequential damages, including loss of data, profits, reputation, or business opportunities, arising from your use of the website.</p>
 <h3>12. Indemnity</h3>
-<p>You agree to protect and hold harmless DigiArtz and its owners from claims, damages, liabilities, losses, and expenses arising from your content, your use of the website, or your violation of these Terms.</p>
+<p>You agree to protect and hold harmless oredlab and its owners from claims, damages, liabilities, losses, and expenses arising from your content, your use of the website, or your violation of these Terms.</p>
 <h3>13. Termination</h3>
-<p>We may suspend or terminate your access to DigiArtz at any time if we believe you violated these Terms, created risk, or harmed the platform or its users.</p>
+<p>We may suspend or terminate your access to oredlab at any time if we believe you violated these Terms, created risk, or harmed the platform or its users.</p>
 <p>You may stop using the service at any time.</p>
 <h3>14. Changes to the Terms</h3>
-<p>We may update these Terms from time to time. Continued use of DigiArtz after changes are posted means you accept the updated Terms.</p>
+<p>We may update these Terms from time to time. Continued use of oredlab after changes are posted means you accept the updated Terms.</p>
 <h3>15. Governing Law</h3>
 <p>These Terms will be governed by the laws of [your country/state], unless local law requires otherwise.</p>
 <h3>16. Contact</h3>

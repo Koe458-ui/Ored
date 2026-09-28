@@ -1,5 +1,5 @@
-DigiArtz — The Digital Art Community
-> DigiArtz is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves.
+oredlab — The Digital Art Community
+> oredlab is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves.
 
 ## 🌐 Live Site
 https://digiartz.net
@@ -17,7 +17,7 @@ https://digiartz.net
 - Cloudflare Pages (hosting)
 
 ## 👥 Team
-The DigiArtz Team — digiartz.net
+The oredlab Team — digiartz.net
 
 Albaze , Deepak and Koe
 

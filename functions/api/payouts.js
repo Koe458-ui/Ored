@@ -458,7 +458,7 @@ export async function onRequestPost({ env, request }) {
           body: JSON.stringify({
             sender_batch_header: {
               sender_batch_id: batchId,
-              email_subject: 'Your DigiArtz payout',
+              email_subject: 'Your oredlab payout',
               email_message: 'Your marketplace earnings have been sent.',
             },
             items: [{
@@ -466,7 +466,7 @@ export async function onRequestPost({ env, request }) {
               receiver: req.destination,
               amount: { value: toValue(req.net_amount != null ? req.net_amount : req.amount,
                                        req.currency), currency: req.currency },
-              note: 'DigiArtz marketplace earnings',
+              note: 'oredlab marketplace earnings',
               sender_item_id: req.id,
             }],
           }),
