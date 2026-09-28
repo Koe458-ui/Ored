@@ -1,4 +1,4 @@
-Ored - the art community
+## 🎨 Ored - the art community
 > oredlab is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves.
 
 ## 🌐 Live Site
