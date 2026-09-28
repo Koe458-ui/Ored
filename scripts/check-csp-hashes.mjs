@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// The Report-Only policy in _headers names every inline script in index.html by
+// The Report-Only policy (functions/lib/csp.js) names every inline script in index.html by
 // SHA-256. That list is only useful while it is exact: one edit to an inline
 // block and the report fills with violations for a script that is ours and
 // fine, which is how a reporting channel becomes noise and then becomes
@@ -17,6 +17,8 @@ import { createHash } from 'node:crypto';
 
 const html = readFileSync('index.html', 'utf8');
 const headers = readFileSync('_headers', 'utf8');
+// Too long for a _headers line on Workers, so the middleware sends this one.
+const cspModule = readFileSync('functions/lib/csp.js', 'utf8');
 
 const line = (name) => {
   const m = headers.match(new RegExp('^\\s*' + name + ':\\s*(.+)$', 'm'));
@@ -24,14 +26,14 @@ const line = (name) => {
 };
 
 const enforcing = line('Content-Security-Policy');
-const strict = line('Content-Security-Policy-Report-Only');
+const strict = (cspModule.match(/^export const REPORT_ONLY_CSP = "([^"]+)";$/m) || [])[1] || null;
 
 let failed = 0;
 const fail = (msg) => { failed++; console.error(`::error::${msg}`); };
 const ok = (msg) => console.log(`ok    ${msg}`);
 
 if (!enforcing) fail('_headers has no Content-Security-Policy');
-if (!strict) fail('_headers has no Content-Security-Policy-Report-Only');
+if (!strict) fail('functions/lib/csp.js has no REPORT_ONLY_CSP');
 if (!enforcing || !strict) process.exit(1);
 
 const scriptSrc = (csp) => {

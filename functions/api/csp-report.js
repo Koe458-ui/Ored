@@ -1,4 +1,4 @@
-// Where the Report-Only policy in _headers sends what it would have blocked.
+// Where the Report-Only policy (lib/csp.js) sends what it would have blocked.
 //
 // The enforcing policy still carries 'unsafe-inline' and 'unsafe-eval' in
 // script-src, and neither can be removed on a guess: 'unsafe-inline' is wanted

@@ -1,6 +1,7 @@
 import { underEdgeLimit, tooManyRequests } from './lib/ratelimit.js';
 import { sbUrl, sbAnon, SB_SIZE_RE } from './lib/sb.js';
 import { SITE, UUID_RE, esc } from './lib/http.js';
+import { REPORT_ONLY_CSP } from './lib/csp.js';
 
 const CACHE_SECONDS = 300;
 const ROW_CACHE_SECONDS = 60;
@@ -387,7 +388,7 @@ function applyMeta(rw, m) {
   return rw;
 }
 
-export async function onRequest(context) {
+async function render(context) {
   const { env, request, next } = context;
 
   let reqPath = '/';
@@ -482,3 +483,13 @@ export async function onRequest(context) {
 
   return rw.transform(origin);
 }
+
+// Runs first, so the header lands on whatever render() returns.
+async function reportOnlyCsp({ next }) {
+  const res = await next();
+  const out = new Response(res.body, res);
+  out.headers.set('content-security-policy-report-only', REPORT_ONLY_CSP);
+  return out;
+}
+
+export const onRequest = [reportOnlyCsp, render];
