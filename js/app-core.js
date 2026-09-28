@@ -697,7 +697,11 @@
     invalidateThread: noop2, invalidateAnalytics: noop2, invalidateUserList: noop2
   };
   function noop2(){ return Promise.resolve(); }
-    // Every path filling dzArtistCache reads the same columns. They each named their own, and a card from another's row read 0
+// Every path filling dzArtistCache reads the same columns. They each named their own, and a card from another's row read 0
+  var DZ_ARTIST_COLS = 'id,username,display_name,avatar_url,banner_url,bio,follower_count';
+  window.DZ_ARTIST_COLS = DZ_ARTIST_COLS;
+
+    // Guests can't read artworks.storage_path, so select('*') fails for them. Name the columns instead.
   var DZ_ART_COLS = 'id,title,image_url,created_at,category,name,description,user_id,tags,status,software,' +
     'thumb_x,thumb_y,view_count,phash,kind,pages,like_count,bookmark_count,download_count,content_rating,' +
     'is_mature,thumb_zoom,summary,subject_matter,medium,software_list,license,commercial_use,' +
