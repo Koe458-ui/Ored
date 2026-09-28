@@ -9,7 +9,7 @@ export async function onRequestPost(context) {
 
   try {
     if (!sameOrigin(request, env)) {
-      return json({ error: 'Downloads must come from the DigiArtz site.' }, 403);
+      return json({ error: 'Downloads must come from the oredlab site.' }, 403);
     }
 
     const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');

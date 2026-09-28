@@ -22,7 +22,6 @@ const PLANS = [
       'Full-resolution original files',
       'Full access to premium artworks',
       'Premium resources & blog extras',
-      'Post 1 job a month — hiring needs a plan',
       'Better support',
     ],
     cta: 'Go Premium',
@@ -38,7 +37,6 @@ const PLANS = [
       'No ads anywhere on the site',
       'A community of your own, without Level 100',
       'Upload artwork up to 25MB, and 400MB product files',
-      'Post 2 jobs a month — twice Premium',
       'Early access to new features',
       'Priority support',
     ],
@@ -58,7 +56,6 @@ const COMPARE = {
     { label: 'Download quality',    free: '1600px',  lite: '1600px',  premium: 'Original', max: 'Original' },
     { label: 'Artwork upload size', free: '20MB',    lite: '20MB',    premium: '20MB',     max: '25MB' },
     { label: 'Product file size',   free: '200MB',   lite: '200MB',   premium: '200MB',    max: '400MB' },
-    { label: 'Job postings a month',free: false,     lite: false,     premium: '1',        max: '2' },
     { label: 'You keep on a sale',  free: '85%',     lite: '85%',     premium: '85%',      max: '90%' },
     { label: 'Premium artworks',    free: false,     lite: false,     premium: true,       max: true },
     { label: 'Community of your own', free: 'Level 100', lite: 'Level 100', premium: 'Level 100', max: 'Included' },
@@ -145,9 +142,7 @@ function plansHtml(priced) {
         '</table>' +
       '</div>' +
       '<p class="subCmpNote">A community earned at artist Level 100 is yours for good. ' +
-      'The one included with Max stays open while the subscription does, plus three days. ' +
-      'Job postings refill once every plan month \u2014 Free and Lite read and apply to ' +
-      'every posting, but putting one up needs Premium or Max.</p>' +
+      'The one included with Max stays open while the subscription does, plus three days.</p>' +
     '</div>';
 
   return '<div class="subPgHeadline"><h2>Choose Your Plan</h2>' +
@@ -356,7 +351,7 @@ const MODULE = `
         order_id: order.orderId,
         amount: order.amount,
         currency: order.currency,
-        name: 'DigiArtz',
+        name: 'oredlab',
         description: order.label || '',
         theme: { color: '#7C3AED' },
         handler: function(r){
@@ -548,7 +543,7 @@ const MODULE = `
     root.innerHTML =
       '<header class="dzCoBar">' +
         '<button class="dzCoBack" type="button" aria-label="Leave checkout">\\u2190</button>' +
-        '<div class="dzCoBrand">Digi<span class="dzCoBrandA">Artz</span></div>' +
+        '<div class="dzCoBrand">ored<span class="dzCoBrandA">lab</span></div>' +
         '<div class="dzCoLock"><span aria-hidden="true">\\ud83d\\udd12</span>Secure</div>' +
       '</header>' +
       '<div class="dzCoScroll"><div class="dzCoWrap">' +
@@ -597,7 +592,7 @@ const MODULE = `
         '</section>' +
 
         '<p class="dzCoFine">Your card, UPI or PayPal details are entered in the ' +
-          'provider\\u2019s own window and never reach DigiArtz. Questions about a ' +
+          'provider\\u2019s own window and never reach oredlab. Questions about a ' +
           'payment: DigiArtzsupport@gmail.com</p>' +
       '</div></div>';
 
@@ -765,8 +760,8 @@ const MODULE = `
             'whatever happens to your plan.'
     };
     return {
-      title: 'Support DigiArtz',
-      name: 'Support DigiArtz',
+      title: 'Support oredlab',
+      name: 'Support oredlab',
       sub: 'A one-off contribution',
       price: moneyMinor(amount, cur),
       priceLabel: 'Amount',
@@ -1126,7 +1121,7 @@ const MODULE = `
     if(!g) return '';
     var rows = [
       ['Gateway fee',        s.pending_gateway || 0],
-      ['DigiArtz commission', s.pending_fee || 0],
+      ['oredlab commission', s.pending_fee || 0],
       ['Tax withheld (194-O)', s.pending_tds || 0],
       ['GST TCS collected',  s.pending_tcs || 0]
     ].filter(function(r){ return r[1] > 0; });
@@ -1252,9 +1247,9 @@ const MODULE = `
             'international one, PayPal up to five business days. Pending shows ' +
             'the whole sale and what will come out of it; the wallet shows only ' +
             'what has cleared and is genuinely yours.</li>' +
-          '<li>DigiArtz will take a 10% platform charge and 5% GST (government tax). ' +
+          '<li>oredlab will take a 10% platform charge and 5% GST (government tax). ' +
             'The remaining 85% goes to the user. Max Subscription users will get 90% ' +
-            'of the commission, while DigiArtz will take 5% as the platform charge and ' +
+            'of the commission, while oredlab will take 5% as the platform charge and ' +
             '5% for GST and other taxes.</li>' +
           '<li>Losing money due to scams will not be tolerated. If you send money ' +
             'without our involvement, we cannot help with recovery.</li>' +
@@ -1268,7 +1263,7 @@ const MODULE = `
           '<li>If you have any questions, email us at:' +
             '<a class="dzWlGuideMail" href="mailto:DigiArtzsupport@gmail.com' +
             '?subject=Wallet%20question" ' +
-            'aria-label="Email DigiArtz support at DigiArtzsupport@gmail.com">' +
+            'aria-label="Email oredlab support at DigiArtzsupport@gmail.com">' +
             '<span aria-hidden="true">✉</span>DigiArtzsupport@gmail.com</a></li>' +
         '</ol>' +
       '</div>';
@@ -1596,7 +1591,7 @@ const MODULE = `
         ['Tax and processing', 'as charged', 'Payment fees, plus whatever tax ' +
           'is due by law on the sale. Not a rate we set.'],
         ['You', '5%', 'Of the sale, paid the moment it settles.'],
-        ['DigiArtz', 'the rest', 'Our commission, less your 5%.']
+        ['oredlab', 'the rest', 'Our commission, less your 5%.']
       ]
     },
     {
@@ -1608,7 +1603,7 @@ const MODULE = `
         ['Tax and processing', '5%', 'Of the full price.'],
         ['You', '2.5%', 'Of the full price — a quarter of what was actually ' +
           'charged.'],
-        ['DigiArtz', '2.5%', 'The same as you.']
+        ['oredlab', '2.5%', 'The same as you.']
       ]
     }
   ];
@@ -1630,7 +1625,7 @@ const MODULE = `
       '</div>';
     }).join('') +
     '<p class="dzClInfoFine">Commissions are credited the moment a sale ' +
-    'settles — there is no holding period, because DigiArtz does not refund ' +
+    'settles — there is no holding period, because oredlab does not refund ' +
     'digital files or subscriptions. If a payment is later charged back by the ' +
     'buyer’s bank, the commission on it is reversed with the sale.</p>';
   }
@@ -1805,7 +1800,7 @@ const MODULE = `
       '</section>';
     }
     return '<section class="dzClCard dzClRoute">' +
-      '<div class="dzClRouteHd">Held in your DigiArtz wallet</div>' +
+      '<div class="dzClRouteHd">Held in your oredlab wallet</div>' +
       '<p>You have not added a payout method, so everything you earn is ' +
         'accumulating here. Nothing is lost or expiring — add an account and ' +
         'you can withdraw it.</p>' +

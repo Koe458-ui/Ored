@@ -15,8 +15,8 @@
 
 .laBrand{ text-align:center; margin-bottom:var(--sp-7); }
 .laEyebrow{ font-family:var(--fm); font-size:var(--fs-2xs); letter-spacing:var(--ls-widest); color:var(--pb); text-transform:uppercase; margin-bottom:var(--sp-4); }
-.laLogo{ font-family:var(--fd); font-weight:800; font-size:var(--fs-5xl); color:var(--vtx); letter-spacing:var(--ls-tight); }
-.laLogo span{ color:var(--pb); }
+.laLogo{ font-family:var(--fd); font-weight:800; font-size:var(--fs-5xl); color:var(--brand-orange); letter-spacing:var(--ls-tight); }
+.laLogo span{ color:var(--brand-red); }
 .laTag{ color:rgba(var(--vtx2-rgb),.55); font-size:var(--fs-md); line-height:var(--lh-body); margin-top:var(--sp-6); }
 
 .laFeatures{ display:flex; justify-content:center; gap:var(--sp-7); flex-wrap:wrap; margin:var(--sp-8) 0; }

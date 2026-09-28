@@ -310,7 +310,7 @@
   var cpMsgCache = {};
 
   var CM_CHANNELS = {
-    official: { name:'DigiArtz Official', desc:'Official community of DigiArtz. Get updates, announcements and more.', readOnly:true,
+    official: { name:'oredlab Official', desc:'Official community of oredlab. Get updates, announcements and more.', readOnly:true,
                 icon:'🎨', grad:'linear-gradient(135deg,#4c1d95 0%,#7c3aed 55%,#a855f7 100%)' },
     arttalk : { name:'Art Talk',         desc:'Discuss about art, share your thoughts, ask questions and grow together.',
                 icon:'💬', grad:'linear-gradient(135deg,#0f766e 0%,#0891b2 55%,#22d3ee 100%)' },
@@ -766,8 +766,8 @@ function hideCommentThumbnail(){
     ['cmiJoinBtn','cmiLeaveBtn','cmiDeleteBtn'].forEach(function(id){ cmiEl(id).hidden = true; });
     cmiEl('cmiReportBtn').hidden = !!ch.readOnly;
     cmiEl('cmiActNote').textContent = ch.readOnly
-      ? 'An official DigiArtz room. Everyone can read it; only DigiArtz posts.'
-      : 'A room DigiArtz runs. Everyone signed in can read and post here.';
+      ? 'An official oredlab room. Everyone can read it; only oredlab posts.'
+      : 'A room oredlab runs. Everyone signed in can read and post here.';
   }
 
   async function cmiLoadCommunity(){
@@ -1703,7 +1703,7 @@ function hideCommentThumbnail(){
 
     var chan = CM_CHANNELS[cpCurrentChannel];
     if(chan && chan.readOnly && !isDev){
-      showToast('Only DigiArtz can post in this channel.');
+      showToast('Only oredlab can post in this channel.');
       return;
     }
 

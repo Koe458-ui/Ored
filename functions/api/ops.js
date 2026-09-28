@@ -518,7 +518,6 @@ const PANEL_TEL = `
             stat('Resources', c.resources, day.resources),
             stat('Marketplace', c.marketplace, day.marketplace),
             stat('Blogs', c.blogs, day.blogs),
-            stat('Jobs', c.jobs, day.jobs),
             stat('Communities', c.communities, null)
           ]) +
           group('Subscriptions, live', [

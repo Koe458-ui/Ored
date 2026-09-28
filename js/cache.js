@@ -32,7 +32,6 @@
     'section:blog':      { ttl: 5 * MIN,   swr: 10 * MIN, scope: 'public', store: 'both', offline: true },
     'section:resources': { ttl: 5 * MIN,   swr: 10 * MIN, scope: 'public', store: 'both', offline: true },
     'section:marketplace': { ttl: 3 * MIN, swr: 10 * MIN, scope: 'public', store: 'both', offline: true },
-    'section:jobs':      { ttl: 60 * SEC,  swr: 5 * MIN,  scope: 'public', store: 'both', offline: true },
     'section:item':      { ttl: 5 * MIN,   swr: 15 * MIN, scope: 'public', store: 'both', cap: 80, capAt: 2, offline: true },
 
     'cart':              { ttl: 15 * SEC,  swr: 0,        scope: 'private', store: 'memory' },
@@ -719,7 +718,7 @@
       var s = stats();
       s.disk = rows.length;
       try {
-        console.log('%cdigiartz cache', 'font-weight:bold');
+        console.log('%coredlab cache', 'font-weight:bold');
         console.table([s]);
         var byPolicy = {};
         rows.forEach(function (r) {

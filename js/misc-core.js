@@ -8,7 +8,7 @@
     { lvl: 50,  name: 'Community Star',  v: '--ms5' },
     { lvl: 70,  name: 'Master Creator',  v: '--ms6' },
     { lvl: 85,  name: 'Elite Artist',    v: '--ms7' },
-    { lvl: 100, name: 'DigiArtz Legend', v: '--ms8' }
+    { lvl: 100, name: 'oredlab Legend', v: '--ms8' }
   ];
 
   function tierFor (level) {

@@ -11,7 +11,7 @@ export async function servePrivateFile(request, env, spec) {
     if (!SB_URL || !SB_KEY) return notConfigured();
 
     if (!sameOrigin(request, env))
-      return json({ error: 'Downloads must come from the DigiArtz site.' }, 403);
+      return json({ error: 'Downloads must come from the oredlab site.' }, 403);
 
     const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
     if (!token) return json({ reason: 'auth', error: 'Sign in to download.' }, 401);

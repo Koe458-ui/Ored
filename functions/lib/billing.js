@@ -59,7 +59,7 @@ export const TIER_RANK = { lite: 1, premium: 2, max: 3 };
 
 export const PLAN_LABEL = {
   lite: 'Lite \u2014 1 month', premium: 'Premium \u2014 1 month',
-  max: 'Max \u2014 1 month',   support: 'Support DigiArtz',
+  max: 'Max \u2014 1 month',   support: 'Support oredlab',
 };
 
 export const SUB_DAYS = 31;

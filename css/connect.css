@@ -32,11 +32,11 @@ footer.siteFooter {
   font-size: var(--fs-3xl);
   font-weight: 900;
   letter-spacing: var(--ls-wider);
-  color: var(--tx);
+  color: var(--brand-orange);
   line-height: var(--lh-flat);
 }
 .ftBrandName .ftBrandAccent {
-  color: var(--pg);
+  color: var(--brand-red);
 }
 .ftBrandTagline {
   font-family: var(--fm);

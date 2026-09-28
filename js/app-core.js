@@ -341,11 +341,9 @@
     'bag'      :'<path d="M6 2.5 3.5 6.5v13A1.5 1.5 0 0 0 5 21h14a1.5 1.5 0 0 0 1.5-1.5v-13L18 2.5z"/><path d="M3.5 6.5h17"/><path d="M15.5 10a3.5 3.5 0 0 1-7 0"/>',
     'bike'     :'<circle cx="6" cy="16.5" r="3.5"/><circle cx="18" cy="16.5" r="3.5"/><path d="M6 16.5l4-8h5l3 8"/><path d="M9 8.5h4"/>',
     'book'     :'<path d="M12 7c-1.8-1.3-4-2-6.5-2H3v13h2.5c2.5 0 4.7.7 6.5 2 1.8-1.3 4-2 6.5-2H21V5h-2.5C16 5 13.8 5.7 12 7z"/><path d="M12 7v13"/>',
-    'briefcase':'<rect x="2.5" y="7" width="19" height="13.5" rx="2"/><path d="M16 20.5V5.5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v15"/>',
     'brush'    :'<path d="M15.5 3.5a2.1 2.1 0 0 1 3 3L9.5 15.5l-4 1 1-4z"/><path d="M5 18.5c1.5 0 2.5 1 2.5 2.5H3c0-1.5.5-2.5 2-2.5z"/>',
     'building' :'<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8.5 7.5h2"/><path d="M13.5 7.5h2"/><path d="M8.5 12h2"/><path d="M13.5 12h2"/><path d="M10 21v-4h4v4"/>',
     'calendar' :'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>',
-    'cap'      :'<path d="M2.5 8.5 12 4l9.5 4.5L12 13z"/><path d="M6.5 10.5V16c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3v-5.5"/>',
     'car'      :'<path d="M3.5 16.5v-4l2-5h13l2 5v4z"/><path d="M5 16.5v2.5h2.5v-2.5"/><path d="M16.5 16.5V19H19v-2.5"/><circle cx="7.5" cy="13.5" r="1"/><circle cx="16.5" cy="13.5" r="1"/>',
     'card'     :'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><path d="M6.5 15h3"/>',
     'cart'     :'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h3l2.6 12.4a1.8 1.8 0 0 0 1.8 1.4h8.4a1.8 1.8 0 0 0 1.8-1.4L21.5 7H6"/>',
@@ -389,16 +387,15 @@
     'type'     :'<path d="M4 6V4.5h16V6"/><path d="M12 4.5V20"/><path d="M9 20h6"/>',
     'user'     :'<circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/>',
     'users'    :'<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18 14.4a6.5 6.5 0 0 1 3.5 5.6"/>',
-    'wifi'     :'<path d="M2.5 9a14 14 0 0 1 19 0"/><path d="M6 12.5a9 9 0 0 1 12 0"/><path d="M9.5 16a4 4 0 0 1 5 0"/><circle cx="12" cy="19.5" r="1"/>',
     'zap'      :'<path d="M13.5 2.5 4.5 13.5h6l-.5 8 9-11h-6z"/>'
   };
   var FLT_ICO_MAP = {};
   (
     'anchor ships|archive old orders releases|atom sci-fi|bag services|bike bikes|' +
-    'book comic manga tutorials|briefcase freelance|' +
+    'book comic manga tutorials|' +
     'brush brushes fan-art traditional-art|' +
-    'building architecture buildings cityscape full-time|calendar events|cap internship|' +
-    'car cars|card checkout|cart shopping-cart|chart trending|clock new part-time|' +
+    'building architecture buildings cityscape|calendar events|' +
+    'car cars|card checkout|cart shopping-cart|chart trending|clock new|' +
     'cpu mecha robots|cube 3d-art 3d-assets 3d-models tips-guides|cup food-art|' +
     'dots others|download digital-downloads downloads|droplet marine-life|feather birds|' +
     'file illustrations news psd-files|flame dragons monsters mythology|flower flowers|' +
@@ -409,9 +406,9 @@
     'mountain landscapes scenery|palette color-palettes concept-art|paw animals|' +
     'pencil sketches|plane aircraft|puzzle plugins|shield licenses|smile anime icons|' +
     'sparkle aesthetic-art chibi fantasy|star artist-spotlights|' +
-    'tag logos poster-art prints|trophy challenges contest|truck buses trucks|' +
-    'type fonts typography|user characters commissions hiring-artists|' +
-    'users collaboration community|wifi remote|zap weapons'
+    'tag logos poster-art prints|trophy challenges|truck buses trucks|' +
+    'type fonts typography|user characters commissions|' +
+    'users community|zap weapons'
   ).split('|').forEach(function(run){
     var w = run.split(' ');
     for(var i = 1; i < w.length; i++) FLT_ICO_MAP[w[i]] = w[0];

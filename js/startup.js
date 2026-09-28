@@ -30,7 +30,7 @@
     });
     var pm = window.location.pathname.match(/^\/profile\/([^/]+)\/?$/);
     if(pm && stillBooting) openProfileByUsername(dzDecodeSeg(pm[1]), false);
-    var sm = window.location.pathname.match(/^\/(resource|blog|listing|job)\/([^/]+)\/?$/);
+    var sm = window.location.pathname.match(/^\/(resource|blog|listing)\/([^/]+)\/?$/);
     if(sm && stillBooting && typeof window.dzOpenById === 'function') window.dzOpenById(sm[1], sm[2]);
     injectGallerySEO();
   })();
@@ -49,7 +49,7 @@
     ld.textContent = JSON.stringify({
       '@context':'https://schema.org',
       '@type':'ImageGallery',
-      'name':'Digiartz Gallery',
+      'name':'oredlab Gallery',
       'url':SITE_URL+'/',
       'image':images.slice(0,100).map(function(a){
         return {

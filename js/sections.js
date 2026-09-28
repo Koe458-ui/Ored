@@ -35,20 +35,6 @@
              'delivery_notes,custom_requests,revision_count,support_period,refund_policy,'+
              'preview_watermark,safety_notes,seller_note,apply_url,apply_email,'+
              'buyer_gets,featured,closing_date,created_at'
-    },
-    jobs: {
-      table:'jobs', kind:'list', noun:'job',
-      eq:{ visibility:'public' },
-      order:[['featured',false],['created_at',false]],
-      select:'id,user_id,title,company,company_url,about_company,description,category,tags,'+
-             'employment_type,experience_level,years_experience,openings,'+
-             'responsibilities,requirements,required_skills,nice_to_have_skills,benefits,'+
-             'work_mode,is_remote,location_city,location_country,applicant_countries,'+
-             'timezone,working_hours,schedule,start_date,contract_duration,'+
-             'salary_min,salary_max,salary_currency,salary_unit,apply_url,apply_email,'+
-             'application_instructions,application_materials,application_questions,'+
-             'portfolio_required,resume_required,cover_letter_required,'+
-             'valid_through,featured,created_at'
     }
   };
 
@@ -328,67 +314,11 @@
         '<span>'+esc(String(r.read_minutes||1))+' min read</span></div>'+
         '<div class="dzHint">'+esc(ex)+'</div>'+chips(r)+'</div></div>';
     }
-    var where = jobWhere(r), pay = jobPay(r);
-    return '<div class="dzRow" data-id="'+id+'" onclick="dzOpenView(\'jobs\',\''+id+'\')">'+
-      '<div class="dzRowIco">'+esc((r.company||'?').charAt(0).toUpperCase())+'</div>'+
-      '<div style="min-width:0;flex:1"><div class="dzName">'+esc(r.title)+'</div>'+
-      '<div class="dzMeta" style="margin:.2rem 0 .3rem">'+
-      (r.featured ? '<span>★ Featured</span>' : '')+
-      '<span>'+esc(r.company)+'</span>'+
-      (where ? '<span>'+esc(where)+'</span>' : '')+
-      '<span>'+esc(String(r.employment_type||'').replace(/_/g,' '))+'</span>'+
-      (pay ? '<span>'+esc(pay)+'</span>' : '')+
-      (r.openings > 1 ? '<span>'+esc(String(r.openings))+' openings</span>' : '')+
-      '<span>'+esc(ago(r.created_at))+'</span></div>'+chips(r)+'</div></div>';
   }
-
-  var WORK_MODE_LBL = { remote:'Remote', onsite:'On-site', hybrid:'Hybrid' };
-  function jobMode(r){ return r.work_mode || (r.is_remote ? 'remote' : 'onsite'); }
-  function jobWhere(r){
-    var mode = jobMode(r);
-    var place = [r.location_city, r.location_country].filter(Boolean).join(', ');
-    if(mode === 'remote') return 'Remote';
-    if(mode === 'hybrid') return place ? 'Hybrid · '+place : 'Hybrid';
-    return place;
-  }
-  function jobAmount(x, cur){
-    var n = Number(x);
-    try{
-      return new Intl.NumberFormat(undefined,{style:'currency',currency:cur||'USD',
-        maximumFractionDigits: n % 1 ? 2 : 0}).format(n);
-    }catch(e){ return (n % 1 ? n.toFixed(2) : String(n)) + ' ' + (cur||'USD'); }
-  }
-  function jobPay(r){
-    if(r.salary_min == null && r.salary_max == null) return '';
-    var cur = r.salary_currency;
-    var parts = [r.salary_min, r.salary_max].filter(function(x){ return x != null; });
-    if(parts.length === 2 && Number(parts[0]) === Number(parts[1])) parts = [parts[0]];
-    return parts.map(function(x){ return jobAmount(x, cur); }).join(' – ')
-      + (r.salary_unit ? ' / '+String(r.salary_unit).toLowerCase() : '');
-  }
-  window.dzJobWhere = jobWhere;
-  window.dzJobPay   = jobPay;
-  window.dzJobMode  = jobMode;
-  window.dzJobModeLbl = WORK_MODE_LBL;
 
   var LICENSE_RES = [['personal','Personal use only'],['commercial','Commercial use OK'],
                      ['cc0','CC0 — public domain'],['cc-by','CC BY — credit required'],['custom','Custom terms']];
   var LICENSE_MKT = [['standard','Standard'],['extended','Extended'],['exclusive','Exclusive'],['custom','Custom']];
-  var EMP = [['CONTRACTOR','Freelance / contract'],['FULL_TIME','Full-time'],['PART_TIME','Part-time'],
-             ['INTERN','Internship'],['TEMPORARY','Temporary'],['VOLUNTEER','Volunteer / collab'],
-             ['PER_DIEM','Per diem'],['OTHER','Other']];
-  var EMP_FIXED_TERM = { CONTRACTOR:1, TEMPORARY:1 };
-
-  var EXP_LEVEL = [['Entry','Entry level'],['Junior','Junior'],['Mid','Mid level'],
-                   ['Senior','Senior'],['Lead','Lead'],['Principal','Principal'],
-                   ['Manager','Manager'],['Director','Director'],['Executive','Executive']];
-  var WORK_MODE = [['remote','Remote'],['onsite','On-site'],['hybrid','Hybrid']];
-  var PAY_PERIOD = [['HOUR','Per hour'],['DAY','Per day'],['WEEK','Per week'],
-                    ['MONTH','Per month'],['YEAR','Per year']];
-  var VISIBILITY = [['public','Public — listed in Jobs'],
-                    ['unlisted','Unlisted — reachable by link'],
-                    ['private','Private — only you']];
-
   var DZ_SELL_MAX = 50, DZ_GALLERY_MAX = 8;
   var ITEM_TYPE = [['digital','Digital download'],['commission','Commission slot'],['service','Service']];
   var ITEM_SERVICE = { commission:1, service:1 };
@@ -669,73 +599,6 @@
          hint:'Only moderators read this. It is never shown to buyers, and it is not readable '+
               'by the site — not even back to you.'},
         {k:'__auto', t:'auto', label:'Filled in for you', items:MKT_AUTO}
-      ]},
-    jobs: { title:'Post a Job', sub:'Hire an artist, or find someone to build with.',
-      fields:[
-        {k:'title',  t:'text', label:'Job title', req:true, min:3, max:80,
-         ph:'e.g. Character Concept Artist'},
-        {k:'company',t:'text', label:'Company / studio', req:true, min:2, max:80,
-         ph:'Who is hiring?'},
-        {k:'about_company',t:'area', label:'About the company', req:true, min:50, max:2000, rows:4,
-         ph:'Who you are, what you make, how the team works…'},
-        {k:'company_url',t:'text', label:'Company website', min:5, max:200, ph:'https://…'},
-        {k:'category',t:'cat', label:'Category', req:true},
-        {k:'employment_type',t:'sel', label:'Employment type', req:true, options:EMP},
-        {k:'experience_level',t:'sel', label:'Experience level', req:true, options:EXP_LEVEL, def:'Mid'},
-        {k:'years_experience',t:'int', label:'Years of experience', req:true, nmin:0, nmax:60,
-         ph:'e.g. 3', hint:'Whole years. 0 means none required.'},
-        {k:'openings',t:'int', label:'Number of openings', req:true, nmin:1, nmax:999, ph:'e.g. 1'},
-        {k:'description',t:'area', label:'Job overview / description', req:true, min:100, max:5000, rows:8,
-         ph:'What the role is, what the team is building, what a week looks like…'},
-        {k:'responsibilities',t:'area', label:'Responsibilities', req:true, min:50, max:3000, rows:5,
-         ph:'What this person will own — one per line.'},
-        {k:'requirements',t:'area', label:'Requirements', req:true, min:50, max:3000, rows:5,
-         ph:'What they must bring — one per line.'},
-        {k:'required_skills',t:'area', label:'Required skills', req:true, min:10, max:1000, rows:3,
-         ph:'e.g. Photoshop, ZBrush, character anatomy'},
-        {k:'nice_to_have_skills',t:'area', label:'Nice-to-have skills', min:10, max:1000, rows:3,
-         ph:'e.g. Unreal, rigging, motion'},
-        {k:'benefits',t:'area', label:'Benefits / perks', min:20, max:2000, rows:3,
-         ph:'Health cover, kit budget, paid leave, learning stipend…'},
-        {k:'work_mode',t:'sel', label:'Remote / on-site / hybrid', req:true, options:WORK_MODE, def:'remote'},
-        {k:'location_city',t:'text', label:'City', req:true, cond:'place', min:2, max:100,
-         ph:'e.g. Berlin'},
-        {k:'location_country',t:'text', label:'Country code', req:true, cond:'place', min:2, max:2, up:1,
-         ph:'e.g. DE', hint:'Two letters, ISO 3166.'},
-        {k:'applicant_countries',t:'text', label:'Remote eligible countries', req:true, cond:'remote',
-         min:2, max:500, up:1, ph:'e.g. IN, DE, US', hint:'Comma separated country codes.'},
-        {k:'timezone',t:'text', label:'Timezone', req:true, min:3, max:50, ph:'e.g. CET (UTC+1)'},
-        {k:'working_hours',t:'text', label:'Working hours', req:true, min:3, max:100,
-         ph:'e.g. 10:00–18:00, 4h overlap with CET'},
-        {k:'schedule',t:'text', label:'Schedule', min:3, max:100, ph:'e.g. Mon–Fri, flexible Fridays'},
-        {k:'start_date',t:'date', label:'Start date', req:true, hint:'When the role begins.'},
-        {k:'contract_duration',t:'text', label:'Contract duration', req:true, cond:'term', min:2, max:100,
-         ph:'e.g. 6 months'},
-        {k:'salary_min',t:'money', label:'Pay from', req:true, nmin:0, nmax:99999999, ph:'0'},
-        {k:'salary_max',t:'money', label:'Pay to', req:true, nmin:0, nmax:99999999, ph:'0'},
-        {k:'salary_currency',t:'sel', label:'Currency', req:true, options:DZ_CURRENCIES, pref:1},
-        {k:'salary_unit',t:'sel', label:'Pay period', req:true, options:PAY_PERIOD, def:'MONTH'},
-        {k:'apply_url',t:'text', label:'Apply link', reqOne:'apply', min:10, max:200,
-         ph:'https://…',
-         hint:'A link or an email is required — either one will do, and a posting may carry both.'},
-        {k:'apply_email',t:'text', label:'Apply email', reqOne:'apply', min:5, max:254,
-         ph:'jobs@studio.com',
-         hint:'A link or an email is required — either one will do, and a posting may carry both.'},
-        {k:'application_instructions',t:'area', label:'Application instructions', req:true,
-         min:20, max:1500, rows:3, ph:'How to apply, what to put in the subject line, what happens next…'},
-        {k:'application_materials',t:'area', label:'Required application materials', req:true,
-         min:10, max:1000, rows:2, ph:'e.g. Portfolio link, CV, two reference shots'},
-        {k:'application_questions',t:'area', label:'Application questions', min:5, max:1000, rows:2,
-         ph:'Anything you want every applicant to answer — one per line.'},
-        {k:'portfolio_required',t:'chk', label:'Portfolio required'},
-        {k:'resume_required',t:'chk', label:'Resume / CV required'},
-        {k:'cover_letter_required',t:'chk', label:'Cover letter required'},
-        {k:'valid_through',t:'date', label:'Closing date', req:true,
-         hint:'Expired postings are hidden automatically.'},
-        {k:'tags',  t:'tags', label:'Tags', max:30},
-        {k:'visibility',t:'sel', label:'Visibility', req:true, options:VISIBILITY, def:'public'},
-        {k:'featured',t:'chk', label:'Feature / promote this posting',
-         hint:'Featured postings sit at the top of the jobs list.'}
       ]}
   };
 
@@ -746,10 +609,9 @@
     return s;
   }
 
-  var TAB_LABEL = {artwork:'Artworks', resources:'Resources', blog:'Blog', marketplace:'Market', jobs:'Jobs'};
+  var TAB_LABEL = {artwork:'Artworks', resources:'Resources', blog:'Blog', marketplace:'Market'};
   var NAV_TITLE = {artwork:'UPLOAD ARTWORK', marketplace:'LIST A PRODUCT',
-                   blog:'WRITE A BLOG POST', resources:'SHARE A RESOURCE',
-                   jobs:'POST A JOB'};
+                   blog:'WRITE A BLOG POST', resources:'SHARE A RESOURCE'};
   var upSec = 'artwork';
 
   // ---- Editing a published resource, post or listing -------------------------
@@ -1097,7 +959,7 @@
 
   var SEC_COLOR = {
     artwork:'var(--upcViolet)', resources:'var(--upcGreen)', blog:'var(--upcIndigo)',
-    marketplace:'var(--upcOrange)', jobs:'var(--upcSky)'
+    marketplace:'var(--upcOrange)'
   };
 
   function upMountForm(sec){
@@ -1137,175 +999,7 @@
     if(h) h.textContent = FORMS[sec].title;
     if(p) p.textContent = FORMS[sec].sub;
 
-    if(sec === 'jobs'){ dzJobGateMount(); return; }
     upMountForm(sec);
-  }
-
-  var dzJobQ = null, dzJobQAt = 0, dzJobQFly = null;
-  var DZ_JOB_Q_TTL = 60000;
-
-  function dzJobQuota(force){
-    if(!sb || !window.currentUser){
-      return Promise.resolve({allowed:false, reason:'auth', limit:0, used:0, remaining:0});
-    }
-    if(!force && dzJobQ && (Date.now() - dzJobQAt) < DZ_JOB_Q_TTL){
-      return Promise.resolve(dzJobQ);
-    }
-    if(!force && dzJobQFly) return dzJobQFly;
-    dzJobQFly = sb.rpc('dz_job_quota').then(function(res){
-      dzJobQFly = null;
-      if(res.error) throw res.error;
-      dzJobQ = res.data || {allowed:false, reason:'plan', limit:0, used:0, remaining:0};
-      dzJobQAt = Date.now();
-      return dzJobQ;
-    }, function(err){
-      dzJobQFly = null;
-      throw err;
-    });
-    return dzJobQFly;
-  }
-  function dzJobQuotaForget(){ dzJobQ = null; dzJobQAt = 0; }
-
-  var DZ_JOB_PLANS = [
-    {id:'premium', name:'Premium', tone:'var(--upcIndigo)', n:1,
-     line:'1 job posting a month', cta:'Join Premium'},
-    {id:'max', name:'Max', tone:'var(--upcOrange)', n:2,
-     line:'2 job postings a month', cta:'Get Max'}
-  ];
-
-  function dzJobPlanCards(){
-    return '<div class="upGatePlans">'+
-      DZ_JOB_PLANS.map(function(pl){
-        return '<div class="upGatePlan" style="--gpC:'+pl.tone+'">'+
-          '<div class="upGatePlanName">'+esc(pl.name)+'</div>'+
-          '<div class="upGatePlanNum">'+pl.n+'</div>'+
-          '<div class="upGatePlanLine">'+esc(pl.line)+'</div>'+
-          '<button type="button" class="upBtnPri upGatePlanBtn" '+
-            'onclick="dzJobGateSubscribe()">'+esc(pl.cta)+'</button>'+
-        '</div>';
-      }).join('')+
-    '</div>';
-  }
-
-  function dzJobGateShell(kicker, title, body, inner){
-    return '<div class="upGate">'+
-      '<div class="upGateIco" aria-hidden="true">'+
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '+
-        'stroke-linecap="round" stroke-linejoin="round">'+
-        '<rect x="2" y="7" width="20" height="14" rx="2"/>'+
-        '<path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>'+
-      '</div>'+
-      '<div class="upGateKicker">'+esc(kicker)+'</div>'+
-      '<h3 class="upGateTitle">'+esc(title)+'</h3>'+
-      '<p class="upGateBody">'+esc(body)+'</p>'+
-      (inner || '')+
-    '</div>';
-  }
-
-  function dzJobFmtDate(iso){
-    if(!iso) return '';
-    var d = new Date(iso);
-    if(isNaN(d.getTime())) return '';
-    try{
-      return d.toLocaleDateString(undefined, {day:'numeric', month:'short', year:'numeric'});
-    }catch(e){ return d.toISOString().slice(0,10); }
-  }
-
-  function dzJobGateHtml(q){
-    if(!q || q.reason === 'auth'){
-      return dzJobGateShell(
-        'POST A JOB',
-        'Sign in to hire an artist',
-        'Job postings are tied to an account and a plan. Sign in, then pick '+
-        'Premium or Max to post your first role.',
-        '<div class="upGateActs">'+
-          '<button type="button" class="upBtnPri" onclick="dzJobGateSignIn()">Sign in</button>'+
-        '</div>');
-    }
-
-    if(q.reason === 'limit'){
-      var isMax   = String(q.tier || '') === 'max';
-      var resets  = dzJobFmtDate(q.period_end);
-      var used    = Number(q.used) || 0;
-      var lim     = Number(q.limit) || 0;
-      var inner   = '<div class="upGateMeter"><span>'+used+' of '+lim+' used</span>'+
-                    (resets ? '<span>Resets '+esc(resets)+'</span>' : '')+'</div>';
-      if(!isMax){
-        inner += '<div class="upGatePlans upGatePlans--one">'+
-          '<div class="upGatePlan" style="--gpC:var(--upcOrange)">'+
-            '<div class="upGatePlanName">Max</div>'+
-            '<div class="upGatePlanNum">2</div>'+
-            '<div class="upGatePlanLine">2 job postings a month</div>'+
-            '<button type="button" class="upBtnPri upGatePlanBtn" '+
-              'onclick="dzJobGateSubscribe()">Upgrade to Max</button>'+
-          '</div></div>';
-      }
-      return dzJobGateShell(
-        'POST A JOB',
-        isMax ? 'Both Max postings are live this month'
-              : 'Your Premium posting is live this month',
-        isMax
-          ? ('Max carries 2 postings a plan month. Yours are both up' +
-             (resets ? ' — the next two unlock on ' + resets + '.' : '.'))
-          : ('Premium carries 1 posting a plan month' +
-             (resets ? ', and yours renews on ' + resets + '.' : '.') +
-             ' Max posts two.'),
-        inner);
-    }
-
-    return dzJobGateShell(
-      'POST A JOB',
-      'Hiring is for Premium and Max',
-      'Anyone can read a posting and apply to it. Putting one up is part of a '+
-      'subscription — Premium posts one role a month, Max posts two.',
-      dzJobPlanCards());
-  }
-
-  function dzJobQuotaStrip(q){
-    if(!q || q.staff || q.limit == null) return '';
-    var left = Number(q.remaining) || 0;
-    var lim  = Number(q.limit) || 0;
-    var when = dzJobFmtDate(q.period_end);
-    return '<div class="upQuotaBar">'+
-      '<span class="upQuotaDot" aria-hidden="true"></span>'+
-      '<span class="upQuotaTx"><b>'+left+' of '+lim+'</b> job '+
-      (lim === 1 ? 'posting' : 'postings')+' left on '+
-      esc(String(q.tier || '').replace(/^./, function(c){ return c.toUpperCase(); }))+
-      ' this month</span>'+
-      (when ? '<span class="upQuotaWhen">Resets '+esc(when)+'</span>' : '')+
-    '</div>';
-  }
-
-  function dzJobGateMount(){
-    var box = document.getElementById('upSecForms');
-    if(!box) return;
-    box.innerHTML = '<div class="upGate upGate--wait"><div class="upGateKicker">POST A JOB</div>'+
-                    '<p class="upGateBody">Checking your plan\u2026</p></div>';
-    dzJobQuota().then(dzJobGateApply, function(){
-      if(upSec === 'jobs') upMountForm('jobs');
-    });
-  }
-
-  function dzJobGateApply(q){
-    if(upSec !== 'jobs') return;
-    var box = document.getElementById('upSecForms');
-    if(!box) return;
-    if(!q || !q.allowed){ box.innerHTML = dzJobGateHtml(q); return; }
-    upMountForm('jobs');
-    var strip = dzJobQuotaStrip(q);
-    if(!strip) return;
-    var main = box.querySelector('.upMain');
-    if(main) main.insertAdjacentHTML('afterbegin', strip);
-  }
-
-  function dzJobGateSubscribe(){
-    if(typeof closePfUpload === 'function') closePfUpload();
-    if(typeof openSubscription === 'function') openSubscription();
-  }
-  function dzJobGateSignIn(){
-    if(typeof pfGuestGate === 'function'){
-      pfGuestGate({preventDefault:function(){}, stopPropagation:function(){}});
-    }
   }
 
   var GUIDE = {
@@ -1356,19 +1050,6 @@
              'Spell out every file included and its format','State delivery days for commissions',
              'Answer the license questions — buyers filter on them',
              'The search snippet and the listing address are filled in for you']
-    },
-    jobs: {
-      guide: [
-        ['🎟','A plan to post','Hiring is a Premium or Max feature — Premium posts one role a plan month, Max posts two.'],
-        ['🧭','Be specific','A real title, scope and skill list draws better applicants.'],
-        ['📍','Location or remote','On-site and hybrid roles need a city and country code; a remote one needs the countries you can hire from.'],
-        ['💰','Say what it pays','A pay range, a currency and a period are all required — postings without them get ignored.'],
-        ['🔗','A way to apply','Include an apply link or email — it is required.'],
-        ['🛡','Genuine roles only','No spam, MLM or pay-to-apply postings.']
-      ],
-      tips: ['Put must-have skills up top','Split responsibilities and requirements — one per line reads best',
-             'Name the timezone and the hours you expect overlap in','Describe the team and workflow',
-             'Set a closing date so it expires cleanly']
     }
   };
 
@@ -1509,20 +1190,15 @@
       ICO_CHECK  = '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
       ICO_SHIELD = '<path d="M12 21.6s7.6-3.8 7.6-9.6V5.4L12 2.4 4.4 5.4v6.6c0 5.8 7.6 9.6 7.6 9.6Z"/>',
       ICO_SCREEN = '<rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 16.5V21"/>',
-      ICO_BUILD  = '<rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M9 7h2"/><path d="M13 7h2"/><path d="M9 11h2"/><path d="M13 11h2"/><path d="M10 21.5v-4h4v4"/>',
       ICO_LINK   = '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
       ICO_MAIL   = '<rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="m3 6 9 6.5L21 6"/>',
-      ICO_PIN    = '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
       ICO_COIN   = '<circle cx="12" cy="12" r="9"/><path d="M15 9.4a3.6 3.6 0 1 0 0 5.2"/>',
       ICO_GRID   = '<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',
       ICO_CLOCK  = '<circle cx="12" cy="12" r="9"/><path d="M12 6.8V12l3.2 2"/>',
-      ICO_STAIR  = '<path d="M3 20h4v-4h5v-4h5V8h4"/><path d="M3 20v-4"/>',
-      ICO_USERS  = '<path d="M16 20v-1.8a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.4"/><path d="M22 20v-1.8a4 4 0 0 0-3-3.87"/><path d="M16.5 3.6a4 4 0 0 1 0 7.75"/>',
       ICO_LIST   = '<path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M4.5 6h.01"/><path d="M4.5 12h.01"/><path d="M4.5 18h.01"/>',
       ICO_CLIP   = '<path d="M15.5 3.5H8.5A2 2 0 0 0 6.5 5.5v13a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-13a2 2 0 0 0-2-2Z"/><path d="M9.5 3.5V2h5v1.5"/><path d="M9.5 9h5"/><path d="M9.5 13h5"/>',
       ICO_STAR   = '<path d="m12 2.8 2.9 5.9 6.5.95-4.7 4.6 1.1 6.45L12 17.65 6.2 20.7l1.1-6.45-4.7-4.6 6.5-.95Z"/>',
       ICO_EYE    = '<path d="M1.8 12S5.5 5 12 5s10.2 7 10.2 7-3.7 7-10.2 7S1.8 12 1.8 12Z"/><circle cx="12" cy="12" r="3"/>',
-      ICO_GLOBE  = '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z"/>',
       ICO_SPARK  = '<path d="M12 3v4"/><path d="M12 17v4"/><path d="M4.9 7.5 8 9.3"/><path d="M16 14.7l3.1 1.8"/><path d="M4.9 16.5 8 14.7"/><path d="M16 9.3l3.1-1.8"/><circle cx="12" cy="12" r="3"/>',
       ICO_GIFT   = '<rect x="2.8" y="8.5" width="18.4" height="4" rx="1"/><path d="M4.5 12.5V20a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-7.5"/><path d="M12 8.5V21"/><path d="M12 8.5S10.8 3.5 8 3.5a2.5 2.5 0 0 0 0 5Z"/><path d="M12 8.5s1.2-5 4-5a2.5 2.5 0 0 1 0 5Z"/>',
       ICO_PLANE  = '<path d="M21 3 10.5 13.5"/><path d="M21 3l-6.8 18-3.7-7.5L3 9.8Z"/>';
@@ -1539,28 +1215,12 @@
     tags:[C_CYN,ICO_HASH],
     software:[C_PNK,ICO_SCREEN], software_list:[C_PNK,ICO_SCREEN],
     license:[C_ROS,ICO_SHIELD],
-    price:[C_GRN,ICO_MONEY], salary_min:[C_GRN,ICO_MONEY], salary_max:[C_GRN,ICO_MONEY],
-    currency:[C_YEL,ICO_COIN], salary_currency:[C_YEL,ICO_COIN],
-    item_type:[C_PUR,ICO_GRID], employment_type:[C_PUR,ICO_GRID],
-    delivery_days:[C_TEA,ICO_CLOCK], salary_unit:[C_TEA,ICO_CLOCK],
-    company:[C_BLU,ICO_BUILD], about_company:[C_BLU,ICO_BUILD],
-    company_url:[C_BLU,ICO_LINK], apply_url:[C_BLU,ICO_LINK],
+    price:[C_GRN,ICO_MONEY],
+    currency:[C_YEL,ICO_COIN],
+    item_type:[C_PUR,ICO_GRID],
+    delivery_days:[C_TEA,ICO_CLOCK],
+    apply_url:[C_BLU,ICO_LINK],
     apply_email:[C_CYN,ICO_MAIL],
-    location_city:[C_ORG,ICO_PIN], location_country:[C_ORG,ICO_PIN],
-    applicant_countries:[C_ORG,ICO_GLOBE], is_remote:[C_ORG,ICO_PIN],
-    work_mode:[C_ORG,ICO_GLOBE],
-    valid_through:[C_TEA,ICO_CAL], start_date:[C_TEA,ICO_CAL],
-    experience_level:[C_PUR,ICO_STAIR], years_experience:[C_PUR,ICO_STAIR],
-    openings:[C_PNK,ICO_USERS],
-    responsibilities:[C_GRN,ICO_LIST], requirements:[C_GRN,ICO_LIST],
-    required_skills:[C_CYN,ICO_SPARK], nice_to_have_skills:[C_LIL,ICO_SPARK],
-    benefits:[C_ROS,ICO_GIFT],
-    timezone:[C_TEA,ICO_GLOBE], working_hours:[C_TEA,ICO_CLOCK], schedule:[C_TEA,ICO_CAL],
-    contract_duration:[C_AMB,ICO_CLOCK],
-    application_instructions:[C_BLU,ICO_PLANE], application_materials:[C_BLU,ICO_CLIP],
-    application_questions:[C_CYN,ICO_LINES],
-    portfolio_required:[C_VIO,ICO_CHECK], resume_required:[C_VIO,ICO_CLIP],
-    cover_letter_required:[C_VIO,ICO_PENCIL],
     visibility:[C_YEL,ICO_EYE], featured:[C_AMB,ICO_STAR],
     cover:[C_VIO,ICO_SCREEN],
     content_type:[C_PUR,ICO_GRID],
@@ -2005,9 +1665,6 @@
   function dzRefsAll(sec){ dzEachField(sec, ['list'], dzRefsRender); }
 
   var COND = {
-    place:   function(v){ return v.work_mode !== 'remote'; },
-    remote:  function(v){ return v.work_mode === 'remote'; },
-    term:    function(v){ return !!EMP_FIXED_TERM[v.employment_type]; },
     svc:     function(v){ return !!ITEM_SERVICE[v.item_type]; },
     digital: function(v){ return v.item_type === 'digital'; },
     digitalart: function(v){ return !!ART_DIGITAL[v.medium]; }
@@ -2020,8 +1677,6 @@
   }
   function dzCondState(sec){
     return {
-      work_mode: val(sec,'work_mode'),
-      employment_type: val(sec,'employment_type'),
       item_type: val(sec,'item_type'),
       medium: val(sec,'medium')
     };
@@ -2617,7 +2272,7 @@
   }
   function dzSeoTitle(title){
     var t = String(title || '').trim();
-    if(t.length < 10) t = (t + ' — DigiArtz').trim();
+    if(t.length < 10) t = (t + ' — oredlab').trim();
     t = t.slice(0, 70);
     return t.length >= 10 ? t : null;
   }
@@ -2712,7 +2367,6 @@
     if(old && old.urls) Object.keys(old.urls).forEach(function(k){ dzRevoke(old.urls[k]); });
     S[sec] = {tags:[], files:{}, urls:{}};
     dzAutoReset(sec);
-    if(sec === 'jobs'){ dzJobGateMount(); return; }
     var box = document.getElementById('upSecForms');
     if(box) box.innerHTML = buildForm(sec);
     renderTags(sec);
@@ -2801,9 +2455,7 @@
       upSwitchSection(d.sec);
       dzFormReady(d.sec, function(ok){
         if(!ok){
-          showToast(d.sec === 'jobs'
-            ? 'Posting a job needs Premium or Max — your draft is still saved'
-            : 'Could not open that draft');
+          showToast('Could not open that draft');
           return;
         }
         var s=st(d.sec); s.tags=(d.data.__tags||[]).slice();
@@ -3025,18 +2677,6 @@
       return;
     }
 
-    if(sec === 'jobs'){
-      var jq = null;
-      try{ jq = await dzJobQuota(true); }catch(e){ jq = null; }
-      if(jq && !jq.allowed){
-        showToast(jq.reason === 'limit'
-          ? 'You have used this month\u2019s job postings'
-          : 'Posting a job needs Premium or Max');
-        dzJobGateApply(jq);
-        return;
-      }
-    }
-
     var btn = document.getElementById('dzSubmit-'+sec);
     var s = st(sec), row = {user_id: currentUser.id, tags: s.tags, status:'approved'};
 
@@ -3229,60 +2869,6 @@
         if(mp){ row.preview_url = mp.url; row.preview_storage_path = mp.path; }
         if(mp) pendingMedia.push({ imageKind:'marketImage', url:mp.url, path:mp.path, file:s.files.preview });
       }
-      else if(sec === 'jobs'){
-        var mode   = val(sec,'work_mode') || 'remote';
-        var remote = mode === 'remote';
-        var countries = remote
-          ? val(sec,'applicant_countries').split(',')
-              .map(function(x){ return x.trim().toUpperCase(); }).filter(Boolean)
-          : [];
-        var cc   = remote ? '' : val(sec,'location_country').toUpperCase();
-        var city = remote ? '' : val(sec,'location_city');
-        var url  = dzWebUrl(val(sec,'apply_url'));
-        var mail = val(sec,'apply_email');
-        var site = dzWebUrl(val(sec,'company_url'));
-
-        if(!url && !mail) throw new Error('Add an apply link or an email');
-        if(mail && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail)) throw new Error('That apply email does not look right');
-        if(url && (url.length < 10 || url.length > 200)) throw new Error('The apply link has to be 10–200 characters');
-        if(site && (site.length < 5 || site.length > 200)) throw new Error('The company website has to be 5–200 characters');
-        if(remote && !countries.length) throw new Error('A remote role needs at least one eligible country');
-        if(!remote && cc.length !== 2) throw new Error('Add a two-letter country code');
-        if(countries.length > 60) throw new Error('That is too many eligible countries — list up to 60');
-
-        var payFrom = parseFloat(val(sec,'salary_min'));
-        var payTo   = parseFloat(val(sec,'salary_max'));
-        if(!isFinite(payFrom) || !isFinite(payTo)) throw new Error('Add a pay range');
-        if(payTo < payFrom) throw new Error('Pay to cannot be lower than pay from');
-
-        var closes = val(sec,'valid_through');
-        if(!closes) throw new Error('Add a closing date');
-        if(new Date(closes+'T23:59:59').getTime() < Date.now()){
-          throw new Error('The closing date has already passed');
-        }
-
-        dzCopy(sec, row,
-          'title company about_company description responsibilities requirements ' +
-          'required_skills timezone working_hours application_instructions ' +
-          'application_materials category:[] employment_type:?CONTRACTOR ' +
-          'experience_level:? years_experience:# openings:# nice_to_have_skills:? ' +
-          'benefits:? schedule:? start_date:? salary_currency:?USD salary_unit:?MONTH ' +
-          'application_questions:? portfolio_required:b resume_required:b ' +
-          'cover_letter_required:b visibility:?public featured:b');
-        row.company_url = site || null;
-        row.work_mode = mode;
-        row.is_remote = remote;
-        row.location_city = city || null;
-        row.location_country = cc || null;
-        row.applicant_countries = countries;
-        row.contract_duration = dzCondShow(sec, dzField(sec,'contract_duration'))
-          ? (val(sec,'contract_duration') || null) : null;
-        row.salary_min = payFrom;
-        row.salary_max = payTo;
-        row.apply_url = url || null; row.apply_email = mail || null;
-        row.valid_through = closes;
-      }
-
       var when = dzSchPicked();
       if(when){
         if(tracked){ dzV.step('transfer','pass'); dzV.step('publish','run'); }
@@ -3301,7 +2887,6 @@
         if(sres.error) throw sres.error;
         if(tracked){ dzV.step('publish','pass','Scheduled for '+dzFmtWhen(when)); setTimeout(function(){ dzV.close(); }, 1400); }
         showToast('Scheduled for '+dzFmtWhen(when));
-        if(sec === 'jobs') dzJobQuotaForget();
         dzResetForm(sec);
         return;
       }
@@ -3339,7 +2924,6 @@
 
       if(tracked){ dzV.step('publish','pass'); setTimeout(function(){ dzV.close(); }, 1400); }
       showToast('Published');
-      if(sec === 'jobs') dzJobQuotaForget();
       dzResetForm(sec);
       dzLoaded[sec] = false;
       var cPub = dzc();
@@ -3349,7 +2933,6 @@
         try{ await s3Delete(landedFiles[ci].bucket, landedFiles[ci].path); }
         catch(sweep){ console.error('publish cleanup:', (sweep && sweep.message) || sweep); }
       }
-      if(sec === 'jobs') dzJobQuotaForget();
       if(tracked){ dzV.fail((err && err.message) ? err.message : 'Could not publish'); }
       else { showToast((err && err.message) ? err.message : 'Could not publish'); }
     }finally{
@@ -3404,10 +2987,6 @@
   window.dzSecEnter      = dzSecEnter;
   window.dzSecRender     = dzSecRender;
   window.upSwitchSection = upSwitchSection;
-  window.dzJobQuota        = dzJobQuota;
-  window.dzJobQuotaForget  = dzJobQuotaForget;
-  window.dzJobGateSubscribe= dzJobGateSubscribe;
-  window.dzJobGateSignIn   = dzJobGateSignIn;
   window.upGuideOpen     = upGuideOpen;
   window.upGuideClose    = upGuideClose;
   window.upGuideBackdrop = upGuideBackdrop;

@@ -432,13 +432,13 @@
               function(){ albDoDelete(id); });
   }
   async function albRefreshAll(){
-    var jobs = [];
-    if(currentUser) jobs.push(albLoadMine(true));
+    var tasks = [];
+    if(currentUser) tasks.push(albLoadMine(true));
     if(pf.profile && currentUser && String(pf.profile.id) === String(currentUser.id)){
       pf.albumsLoaded = false;
-      jobs.push(albLoadProfileTab());
+      tasks.push(albLoadProfileTab());
     }
-    try{ await Promise.all(jobs); }catch(e){}
+    try{ await Promise.all(tasks); }catch(e){}
     albUpRender();
   }
 

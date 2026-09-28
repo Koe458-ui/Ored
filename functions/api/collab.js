@@ -179,7 +179,7 @@ const ACTIONS = {
     // an in-app path only, so a notification cannot be a link off the site
     const url = str(body.url, 300);
     if (url && !/^\/[\w\-./]*$/.test(url))
-      throw new Refused('A target has to be a path on DigiArtz, like /explore', 400);
+      throw new Refused('A target has to be a path on oredlab, like /explore', 400);
 
     // names in, ids out — the client never names an id, and never sees one
     let users = null;

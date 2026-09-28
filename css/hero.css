@@ -1062,7 +1062,7 @@ html.dzCoOpen, html.dzCoOpen body{overflow:hidden;}
 @media(hover:hover){.dzCoBack:hover{border-color:var(--bdrh);}}
 .dzCoBrand{
   font-family:var(--fd);font-size:var(--fs-xl);font-weight:800;
-  letter-spacing:var(--ls-tight);color:var(--tx);
+  letter-spacing:var(--ls-tight);color:var(--brand-orange);
 }
 .dzCoBrandA{color:var(--brand-red);}
 .dzCoLock{

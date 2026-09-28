@@ -54,7 +54,7 @@
 
   function why(reason, detail) {
     lastWhy = reason;
-    console.warn('[DigiArtz] No captcha token: ' + reason + '. Sign-in will be refused ' +
+    console.warn('[oredlab] No captcha token: ' + reason + '. Sign-in will be refused ' +
                  'with \u201CCouldn\u2019t verify you\u2019re human\u201D.' +
                  (detail ? '\n' + detail : ''));
   }

@@ -307,8 +307,8 @@ function qrMake (text) {
     var uname = document.getElementById('pfShareUser').textContent || '';
     if (navigator.share) {
       navigator.share({
-        title: 'DigiArtz \u2014 ' + uname,
-        text: 'Check out ' + uname + ' on DigiArtz',
+        title: 'oredlab \u2014 ' + uname,
+        text: 'Check out ' + uname + ' on oredlab',
         url: shareUrl
       }).catch(function () {   });
     } else {

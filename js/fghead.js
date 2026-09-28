@@ -37,12 +37,6 @@
       hint: 'Search resources',
       desc: 'Download brushes, textures, fonts, PSD files, 3D assets, references, ' +
             'colour palettes, mockups, and more.'
-    },
-    jobs: {
-      lead: 'Find *creative work*',
-      hint: 'Search postings',
-      desc: 'Apply for freelance briefs, full-time roles, part-time roles, remote ' +
-            'positions, internships, contests, collaborations, and more.'
     }
   };
 

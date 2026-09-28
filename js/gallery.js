@@ -2,7 +2,6 @@
     resources:   { label:'Resources',   opts:['Tutorials','Brushes','Textures','Fonts','PSD Files','3D Assets','References','Color Palettes','Mockups','Templates','Icons','Plugins'] },
     blog:        { label:'Blog',        opts:['News','Community','Artist Spotlights','Tips & Guides','Interviews','Reviews','Events','Challenges','Releases','Announcements'] },
     marketplace: { label:'Marketplace', opts:['Artwork','Prints','Digital Downloads','Website Templates','UI Kits','Icons','Brushes','3D Models','Commissions','Services'] },
-    jobs:        { label:'Jobs',        opts:['Freelance','Full-Time','Part-Time','Remote','Internship','Contest','Hiring Artists','Collaboration'] },
     cart:        { label:'Cart',        opts:['Shopping Cart','Saved for Later','Checkout','Orders','Downloads','Licenses'] }
   };
   var fgSection = 'artworks';
@@ -11,7 +10,7 @@
   var fgSecQuery  = {};
   var FG_TITLE = {
     artworks:'ARTWORKS', marketplace:'MARKETPLACE', blog:'BLOG',
-    resources:'RESOURCES', jobs:'JOBS'
+    resources:'RESOURCES'
   };
 
   function fgSwitchSection(id){
@@ -900,8 +899,8 @@
     });
   });
 
-  var SITE_NAME = 'Digiartz';
-  var SITE_URL  = 'https://digiartz.net';
+  var SITE_NAME = 'oredlab';
+  var SITE_URL  = 'https://oredlab.com';
   function setMeta(selector, attr, value){
     var el = document.querySelector(selector);
     if(el) el.setAttribute(attr, value);
@@ -940,7 +939,7 @@
       'name':art.name||'Untitled artwork',
       'description':desc,
       'url':url,
-      'creator':{'@type':'Organization','name':'DigiArtz'},
+      'creator':{'@type':'Organization','name':'oredlab'},
       'representativeOfPage':true
     });
   }
