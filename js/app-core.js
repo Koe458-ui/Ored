@@ -698,8 +698,12 @@
   };
   function noop2(){ return Promise.resolve(); }
     // Every path filling dzArtistCache reads the same columns. They each named their own, and a card from another's row read 0
-  var DZ_ARTIST_COLS = 'id,username,display_name,avatar_url,banner_url,bio,follower_count';
-  window.DZ_ARTIST_COLS = DZ_ARTIST_COLS;
+  var DZ_ART_COLS = 'id,title,image_url,created_at,category,name,description,user_id,tags,status,software,' +
+    'thumb_x,thumb_y,view_count,phash,kind,pages,like_count,bookmark_count,download_count,content_rating,' +
+    'is_mature,thumb_zoom,summary,subject_matter,medium,software_list,license,commercial_use,' +
+    'attribution_required,modification_allowed,credits,process_notes,external_links,comments_allowed,' +
+    'visibility,featured,seo_title,seo_description,slug,file_ext,file_size,width,height,updated_at';
+  window.DZ_ART_COLS = DZ_ART_COLS;
 
   function dzCached(){ return window.dzCache || DZ_CACHE_SHIM; }
   window.dzCached = dzCached;
