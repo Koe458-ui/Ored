@@ -861,7 +861,7 @@
   async function dzFetchArtworkById(id){
     if(!sb || !id) return { reached:false, row:null };
     try{
-      var r = await sb.from('artworks').select('*')
+      var r = await sb.from('artworks').select(DZ_ART_COLS)
         .eq('id', String(id)).eq('status','approved').eq('visibility','published').limit(1);
       if(!r || r.error) return { reached:false, row:null };
       return { reached:true, row:(r.data && r.data[0]) || null };

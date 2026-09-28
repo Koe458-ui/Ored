@@ -560,7 +560,7 @@
     try{
       var _own = !!currentUser && String(currentUser.id) === String(forId);
       var _load = async function(){
-        var _q = sb.from('artworks').select('*')
+        var _q = sb.from('artworks').select(DZ_ART_COLS)
           .eq('user_id',forId).eq('kind',ART_KIND_ART);
         if(!_own) _q = _q.eq('visibility','published');
         const{data:rows,error:qe}=await _q
