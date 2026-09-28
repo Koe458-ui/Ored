@@ -3,7 +3,7 @@ export const LEGAL = {
       title: 'PRIVACY POLICY',
       html: `<h2>oredlab Privacy Policy</h2>
 <p><strong>Effective Date:</strong> 6 July 2026</p>
-<p>oredlab ("we," "us," "our") operates digiartz.net as an artist community platform. This Privacy Policy explains how we collect, use, store, share, and protect information when you use our website, services, and community features.</p>
+<p>oredlab ("we," "us," "our") operates oredlab.com as an artist community platform. This Privacy Policy explains how we collect, use, store, share, and protect information when you use our website, services, and community features.</p>
 <p>By using oredlab, you agree to this Privacy Policy.</p>
 <h3>1. Information We Collect</h3>
 <p>We may collect the following types of information:</p>
@@ -94,14 +94,14 @@ export const LEGAL = {
 <p>We may update this Privacy Policy from time to time. When we do, we will post the updated version on this page and revise the effective date above.</p>
 <h3>14. Contact Us</h3>
 <p>If you have any questions or requests about this Privacy Policy, contact us at:</p>
-<p>Email: DigiArtzsupport@gmail.com<br>Website: digiartz.net</p>
+<p>Email: DigiArtzsupport@gmail.com<br>Website: oredlab.com</p>
 <span class="lmDate">EFFECTIVE DATE: 6 JULY 2026</span>`
     },
     terms: {
       title: 'TERMS &amp; CONDITIONS',
       html: `<h2>oredlab Terms and Conditions</h2>
 <p><strong>Effective Date:</strong> 6 July 2026</p>
-<p>These Terms and Conditions ("Terms") govern your use of oredlab and all related pages, features, and services on digiartz.net.</p>
+<p>These Terms and Conditions ("Terms") govern your use of oredlab and all related pages, features, and services on oredlab.com.</p>
 <p>By using oredlab, you agree to these Terms. If you do not agree, do not use the website.</p>
 <h3>1. Who Can Use oredlab</h3>
 <p>You must be legally able to enter into a binding agreement where you live. If you are under the minimum age required by law in your country, you may not use the service without appropriate permission from a parent or guardian, if allowed by law.</p>
@@ -181,7 +181,7 @@ export const LEGAL = {
 <p>These Terms will be governed by the laws of [your country/state], unless local law requires otherwise.</p>
 <h3>16. Contact</h3>
 <p>Questions about these Terms can be sent to:</p>
-<p>Email: DigiArtzsupport@gmail.com<br>Website: digiartz.net</p>
+<p>Email: DigiArtzsupport@gmail.com<br>Website: oredlab.com</p>
 <span class="lmDate">EFFECTIVE DATE: 6 JULY 2026</span>`
     }
   };

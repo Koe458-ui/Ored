@@ -40,7 +40,7 @@ var DZ_BW = (function () {
   var DIGIT_MIN = 10;
 
   var DOMAIN_ALLOW = [
-    'digiartz.net'
+    'oredlab.com'
   ];
 
   var TLDS = [
@@ -86,8 +86,6 @@ var DZ_BW = (function () {
     resources         : ['title', 'description', 'tags', 'software'],
     blog_posts        : ['title', 'excerpt', 'body', 'tags'],
     marketplace_items : ['title', 'description', 'tags'],
-    jobs              : ['title', 'company', 'description', 'tags',
-                         'location_city', 'location_region'],
 
     communities       : ['name', 'description', 'rules'],
 

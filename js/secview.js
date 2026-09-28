@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  var KIND = { resources:'resource', blog:'blog', marketplace:'marketplace', jobs:'job' };
+  var KIND = { resources:'resource', blog:'blog', marketplace:'marketplace' };
   var cur = { sec:null, idx:-1 };
   var curExt = null;
   var profCache = {};
@@ -104,7 +104,7 @@
       if(input) input.value = '';
       var cPost = dzc();
       if(cPost) { try{ await cPost.invalidateComments(kind, id); }catch(e2){} }
-      if(kind !== 'job' && typeof window.dzAnTrack === 'function'){
+      if(typeof window.dzAnTrack === 'function'){
         window.dzAnTrack('comment', String(id), { scope: kind });
       }
       window.dzCmLoad(kind, id, listId);
@@ -262,7 +262,6 @@
     return out ? '<div class="vwActRow">'+out+'</div>' : '';
   }
   function vwSecRail(sec, kind, id, r){
-    if(sec === 'jobs') return '';
     var dl = sec === 'blog' ? (r.cover_url ? imgResize(r.cover_url, 1600) : '')
              // "is there a file" — file_name is set by the same write that sets
              // the storage path, and unlike the path it is not private
@@ -390,15 +389,15 @@
     document.body.removeChild(a);
   };
 
-  var VW_PATH = { resources:'resource', blog:'blog', marketplace:'listing', jobs:'job' };
+  var VW_PATH = { resources:'resource', blog:'blog', marketplace:'listing' };
   var VW_IS_ITEM = new RegExp('^/(?:' +
     Object.keys(VW_PATH).map(function(k){ return VW_PATH[k]; }).join('|') + ')/');
   function vwUrl(sec, id){
     var seg = VW_PATH[sec];
     return seg ? (location.origin + '/' + seg + '/' + id) : location.href;
   }
-  var VW_SEG = { resource:'resources', blog:'blog', listing:'marketplace', job:'jobs' };
-  var VW_TABLE = { resources:'resources', blog:'blog_posts', marketplace:'marketplace_items', jobs:'jobs' };
+  var VW_SEG = { resource:'resources', blog:'blog', listing:'marketplace' };
+  var VW_TABLE = { resources:'resources', blog:'blog_posts', marketplace:'marketplace_items' };
   window.dzOpenById = async function(seg, id){
     var sec = VW_SEG[seg];
     if(!sec || !sb || typeof window.dzSelectFor !== 'function') return;
@@ -423,7 +422,7 @@
   window.dzVwShare = function(sec, id, title){
     var url = vwUrl(sec, id);
     var t = title || document.title;
-    if(KIND[sec] && KIND[sec] !== 'job' && typeof window.dzAnTrack === 'function'){
+    if(KIND[sec] && typeof window.dzAnTrack === 'function'){
       window.dzAnTrack('share', String(id), { scope: KIND[sec] });
     }
     if(navigator.share){ navigator.share({ title:t, url:url }).catch(function(){}); return; }
@@ -704,7 +703,7 @@
     return head ? '<div><div class="avBlockH">'+esc(head)+'</div>'+body+'</div>' : body;
   }
   var linkBlock = window.dzLinkBlock;
-  function jobBlock(head, body){
+  function textBlock(head, body){
     body = String(body == null ? '' : body).trim();
     if(!body) return '';
     return '<div><div class="avBlockH">'+esc(head)+'</div>'+
@@ -728,7 +727,7 @@
     if(!base) return '';
     return (new Date(r.updated_at) - new Date(base) > 60000) ? h.ago(r.updated_at) : '';
   }
-  function jobDate(v){
+  function fmtDate(v){
     if(!v) return '';
     var t = new Date(v);
     if(!isFinite(t.getTime())) return String(v);
@@ -788,8 +787,8 @@
           'aria-label="Download this file" title="Download this file">'+vwSvg('dl')+'</button>' : '')+
         '</div>'+
         (r.description ? '<p class="dzvDesc">'+esc(r.description)+'</p>' : '')+
-        jobBlock('What\u2019s included', r.whats_included)+
-        jobBlock('Installation and use', r.instructions)+
+        textBlock('What\u2019s included', r.whats_included)+
+        textBlock('Installation and use', r.instructions)+
         metaBlock('Details',
                 [['Type', r.resource_type],
                  ['Category', catLabels('resources', r.category)],
@@ -804,7 +803,7 @@
                  ['Format', (r.file_ext||'').toUpperCase()],
                  ['Posted', h.ago(r.created_at)],
                  ['Updated', updatedAgo(r, h)]])+
-        jobBlock('Content notes', r.safety_notes)+
+        textBlock('Content notes', r.safety_notes)+
         linkBlock('Links', r.external_links)+
         tagBlock(r.tags)+
         adBlock()+
@@ -880,7 +879,7 @@
         lockNote+
         reqBtn+
         (r.description ? '<p class="dzvDesc">'+esc(r.description)+'</p>' : '')+
-        jobBlock('What you get', r.buyer_gets)+
+        textBlock('What you get', r.buyer_gets)+
         metaBlock('Details',
                 [['Type', r.item_type],['Product', r.product_type],
                  ['Category', catLabels('marketplace', r.category)],
@@ -899,82 +898,17 @@
                  ['Support', r.support_period],
                  ['Custom requests', r.custom_requests ? 'Accepted' : ''],
                  ['Stock', r.stock != null ? String(r.stock) : ''],
-                 ['Closes', jobDate(r.closing_date)],
+                 ['Closes', fmtDate(r.closing_date)],
                  ['Listed', h.ago(r.created_at)],
                  ['Updated', updatedAgo(r, h)]])+
-        jobBlock('Delivery notes', r.delivery_notes)+
-        jobBlock('Refund policy', r.refund_policy)+
-        (r.preview_watermark ? jobBlock('Previews', 'Preview images are watermarked. The files you receive are not.') : '')+
-        jobBlock('Content notes', r.safety_notes)+
-        jobBlock('From the seller', r.seller_note)+
+        textBlock('Delivery notes', r.delivery_notes)+
+        textBlock('Refund policy', r.refund_policy)+
+        (r.preview_watermark ? textBlock('Previews', 'Preview images are watermarked. The files you receive are not.') : '')+
+        textBlock('Content notes', r.safety_notes)+
+        textBlock('From the seller', r.seller_note)+
         tagBlock(r.tags)+
         adBlock()+
         cmBlock(kind, id)+
-        '</div>';
-    }
-    else {
-      var jw = window.dzJobWhere ? window.dzJobWhere(r)
-             : (r.is_remote ? 'Remote' : [r.location_city, r.location_country].filter(Boolean).join(', '));
-      var jp = window.dzJobPay ? window.dzJobPay(r) : '';
-      var jmode = window.dzJobMode ? window.dzJobMode(r) : (r.is_remote ? 'remote' : 'onsite');
-      var jmodeLbl = (window.dzJobModeLbl || {})[jmode] || '';
-      var exp = [r.experience_level,
-                 (r.years_experience != null ? r.years_experience + '+ yrs' : '')]
-                .filter(Boolean).join(' \u00b7 ');
-      var sends = [r.portfolio_required ? 'Portfolio' : '', r.resume_required ? 'Resume / CV' : '',
-                   r.cover_letter_required ? 'Cover letter' : ''].filter(Boolean).join(' \u00b7 ');
-      var applyUrl = safeHref(r.apply_url);
-      var applyBtn =
-        (applyUrl
-          ? '<a class="avActWide" href="'+esc(applyUrl)+'" target="_blank" rel="noopener">Apply \u2197</a>'
-          : '')+
-        (r.apply_email
-          ? '<a class="avActWide" href="mailto:'+esc(r.apply_email)+'">Apply by email \u2709</a>'
-          : '');
-
-      html = '<div class="dzvCol">'+
-        vwCard('dzvCard', 'dzCloseView()')+
-        (r.featured ? '<p class="dzvExcerpt">\u2605 Featured posting</p>' : '')+
-        '<h1 class="dzvTitle">'+esc(r.title)+'</h1>'+
-        '<p class="dzvExcerpt">'+esc(r.company||'')+
-          (safeHref(r.company_url)
-            ? ' \u00b7 <a href="'+esc(safeHref(r.company_url))+'" target="_blank" rel="noopener">website</a>'
-            : '')+'</p>'+
-        metaRow([
-          ['Location', jw],
-          ['Work mode', jmodeLbl],
-          ['Type', String(r.employment_type||'').replace(/_/g,' ')],
-          ['Experience', exp],
-          ['Pay', jp],
-          ['Openings', r.openings ? String(r.openings) : ''],
-          ['Starts', jobDate(r.start_date)],
-          ['Closes', jobDate(r.valid_through)]
-        ])+
-        applyBtn+
-        jobBlock('About the company', r.about_company)+
-        jobBlock('Overview', r.description)+
-        jobBlock('Responsibilities', r.responsibilities)+
-        jobBlock('Requirements', r.requirements)+
-        jobBlock('Required skills', r.required_skills)+
-        jobBlock('Nice to have', r.nice_to_have_skills)+
-        jobBlock('Benefits', r.benefits)+
-        metaBlock('Role details', [
-          ['Category', catLabels('jobs', r.category)],
-          ['Remote from', (jmode === 'remote' && (r.applicant_countries||[]).length)
-                          ? (r.applicant_countries||[]).join(', ') : ''],
-          ['Timezone', r.timezone],
-          ['Working hours', r.working_hours],
-          ['Schedule', r.schedule],
-          ['Duration', r.contract_duration],
-          ['Posted', h.ago(r.created_at)],
-          ['Updated', updatedAgo(r, h)]
-        ])+
-        jobBlock('How to apply', r.application_instructions)+
-        jobBlock('What to send', r.application_materials)+
-        (sends ? jobBlock('Required with every application', sends) : '')+
-        jobBlock('Questions to answer', r.application_questions)+
-        tagBlock(r.tags)+
-        '<button class="avReportBtn" onclick="dzReportItem(\'job\',\''+id+'\')">\u2691 Report</button>'+
         '</div>';
     }
     host.innerHTML = html;
@@ -988,9 +922,9 @@
     if(nb) nb.style.visibility = (multi && cur.idx < total - 1) ? 'visible' : 'hidden';
 
     vwFill('dzvCard', r.user_id);
-    if(sec !== 'jobs') vwEngPaint(kind, String(r.id));
+    vwEngPaint(kind, String(r.id));
     if(sec === 'blog') fillRelated(r);
-    if(sec !== 'jobs') window.dzCmLoad(kind, String(r.id), 'dzvCmList');
+    window.dzCmLoad(kind, String(r.id), 'dzvCmList');
   }
 
   var pushed = false;
@@ -1022,7 +956,7 @@
   };
   function vwMark(sec, id){
     var an = KIND[sec];
-    if(an && an !== 'job' && typeof window.dzAnItemView === 'function'){
+    if(an && typeof window.dzAnItemView === 'function'){
       window.dzAnItemView(an, String(id));
     }
     var path = VW_PATH[sec] ? ('/'+VW_PATH[sec]+'/'+id) : null;

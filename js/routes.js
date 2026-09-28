@@ -16,7 +16,7 @@
     if (ROUTES[p].section) SECTION_PATH[ROUTES[p].section] = p;
   });
 
-  var FOREIGN_RE = /^\/(?:artwork|profile|resource|blog|listing|job)\/./;
+  var FOREIGN_RE = /^\/(?:artwork|profile|resource|blog|listing)\/./;
 
   function el(id) { return document.getElementById(id); }
   function isOpen(id) {
@@ -106,7 +106,7 @@
     { re: /^\/community\/?$/,                             panel: 'communityPage' },
     { re: /^\/profile\/./,                                panel: 'profilePage' },
     { re: /^\/artwork\/./,                                panel: 'artModal' },
-    { re: /^\/(?:resource|blog|listing|job)\/./,          panel: 'dzView' },
+    { re: /^\/(?:resource|blog|listing)\/./,          panel: 'dzView' },
     { re: /^\/login\/?$/,                                 panel: 'authMod' }
   ];
 

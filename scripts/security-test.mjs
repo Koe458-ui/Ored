@@ -42,20 +42,20 @@ check('most specific prefix wins', limitFor('/api/download').bucket, '/api/downl
   truthy('the shared-address allowance is finite', SHARED >= 1 && SHARED <= 10);
 }
 
-const req = (headers) => ({ url: 'https://digiartz.net/api/download', headers: new Headers(headers) });
+const req = (headers) => ({ url: 'https://oredlab.com/api/download', headers: new Headers(headers) });
 
 falsy('no origin, no referer, no fetch metadata', sameOrigin(req({}), {}));
 falsy('Sec-Fetch-Site: none (address bar)',       sameOrigin(req({ 'Sec-Fetch-Site': 'none' }), {}));
 falsy('cross-site Origin',       sameOrigin(req({ Origin: 'https://evil.example' }), {}));
 falsy('cross-site Referer',      sameOrigin(req({ Referer: 'https://evil.example/x' }), {}));
-falsy('lookalike host',          sameOrigin(req({ Origin: 'https://digiartz.net.evil.example' }), {}));
-truthy('same Origin',            sameOrigin(req({ Origin: 'https://digiartz.net' }), {}));
+falsy('lookalike host',          sameOrigin(req({ Origin: 'https://oredlab.com.evil.example' }), {}));
+truthy('same Origin',            sameOrigin(req({ Origin: 'https://oredlab.com' }), {}));
 truthy('Sec-Fetch-Site: same-origin', sameOrigin(req({ 'Sec-Fetch-Site': 'same-origin' }), {}));
-truthy('ALLOWED_ORIGINS entry',  sameOrigin(req({ Origin: 'https://staging.digiartz.net' }),
-                                            { ALLOWED_ORIGINS: 'https://staging.digiartz.net' }));
+truthy('ALLOWED_ORIGINS entry',  sameOrigin(req({ Origin: 'https://staging.oredlab.com' }),
+                                            { ALLOWED_ORIGINS: 'https://staging.oredlab.com' }));
 falsy('ALLOWED_ORIGINS does not open the door to others',
       sameOrigin(req({ Origin: 'https://evil.example' }),
-                 { ALLOWED_ORIGINS: 'https://staging.digiartz.net' }));
+                 { ALLOWED_ORIGINS: 'https://staging.oredlab.com' }));
 
 const SB = 'https://tmqzqlrpjpydiftlrzmj.supabase.co';
 truthy('project host allowed',      allowedHost(SB + '/storage/v1/object/x', SB));

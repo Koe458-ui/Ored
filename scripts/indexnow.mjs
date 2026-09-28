@@ -1,4 +1,4 @@
-const HOST = 'digiartz.net';
+const HOST = 'oredlab.com';
 const SITE = `https://${HOST}`;
 const KEY  = '8968b78d9c9d0df0553bf47f2e121021';
 const ENDPOINT = 'https://api.indexnow.org/IndexNow';

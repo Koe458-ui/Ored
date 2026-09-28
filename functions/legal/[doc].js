@@ -36,8 +36,8 @@ function page(slug, doc, navTitle) {
 <meta property="og:title" content="${esc(navTitle)} — oredlab">
 <meta property="og:url" content="${esc(url)}">
 <meta property="og:site_name" content="oredlab">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4" sizes="any">
-<link rel="icon" href="/favicon.ico?v=4">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=5" sizes="any">
+<link rel="icon" href="/favicon.ico?v=5">
 <style>
   :root{
     --bg:#ffffff; --fg:#1a1a1f; --muted:#5b5b6b; --line:#e4e4ec;

@@ -49,7 +49,7 @@
   var MENUS = {
     ex: {
       wrap:'dzExWrap', btn:'dzExBtn', grp:'dzMenuExGrp', grpBtn:'dzMenuExBtn',
-      secs:{ artworks:1, marketplace:1, blog:1, resources:1, jobs:1 },
+      secs:{ artworks:1, marketplace:1, blog:1, resources:1 },
       fallback:'artworks',
       pick: function (sec, e) {
         var path = (typeof window.dzRoutePath === 'function') ? window.dzRoutePath(sec) : null;
@@ -88,7 +88,7 @@
     },
     up: {
       wrap:'dzUpWrap', btn:'dzUpBtn', grp:'dzMenuUpGrp', grpBtn:'dzMenuUpBtn',
-      secs:{ artwork:1, marketplace:1, blog:1, resources:1, jobs:1 },
+      secs:{ artwork:1, marketplace:1, blog:1, resources:1 },
       fallback:'artwork',
       pick: function (sec) {
         if (typeof window.bnGoUpload === 'function') window.bnGoUpload(sec);

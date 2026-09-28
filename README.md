@@ -2,7 +2,7 @@ oredlab — The Digital Art Community
 > oredlab is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves.
 
 ## 🌐 Live Site
-https://digiartz.net
+https://oredlab.com
 
 ## ✨ Features
 - Dynamic gallery with Supabase backend
@@ -17,7 +17,7 @@ https://digiartz.net
 - Cloudflare Pages (hosting)
 
 ## 👥 Team
-The oredlab Team — digiartz.net
+The oredlab Team — oredlab.com
 
 Albaze , Deepak and Koe
 

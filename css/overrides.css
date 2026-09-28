@@ -80,17 +80,14 @@
 @media (min-width:900px){
   .dzvBody{ padding-inline:var(--shellPad); }
   #dzView[data-sec="blog"] .dzvBody,
-  #dzView[data-sec="jobs"] .dzvBody,
   #dzView[data-sec="resources"] .dzvBody{
     display:block;overflow-y:auto;padding-bottom:6rem;
   }
   #dzView[data-sec="blog"] .dzvCol,
-  #dzView[data-sec="jobs"] .dzvCol,
   #dzView[data-sec="resources"] .dzvCol{
     max-width:900px;margin-inline:auto;overflow:visible;padding:var(--vwGap) 0 var(--sp-10);
   }
   #dzView[data-sec="blog"] .dzvMedia,
-  #dzView[data-sec="jobs"] .dzvMedia,
   #dzView[data-sec="resources"] .dzvMedia{
     max-width:900px;margin-inline:auto;overflow:visible;padding:var(--vwGap) 0 0;
   }

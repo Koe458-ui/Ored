@@ -22,7 +22,6 @@ const PLANS = [
       'Full-resolution original files',
       'Full access to premium artworks',
       'Premium resources & blog extras',
-      'Post 1 job a month — hiring needs a plan',
       'Better support',
     ],
     cta: 'Go Premium',
@@ -38,7 +37,6 @@ const PLANS = [
       'No ads anywhere on the site',
       'A community of your own, without Level 100',
       'Upload artwork up to 25MB, and 400MB product files',
-      'Post 2 jobs a month — twice Premium',
       'Early access to new features',
       'Priority support',
     ],
@@ -58,7 +56,6 @@ const COMPARE = {
     { label: 'Download quality',    free: '1600px',  lite: '1600px',  premium: 'Original', max: 'Original' },
     { label: 'Artwork upload size', free: '20MB',    lite: '20MB',    premium: '20MB',     max: '25MB' },
     { label: 'Product file size',   free: '200MB',   lite: '200MB',   premium: '200MB',    max: '400MB' },
-    { label: 'Job postings a month',free: false,     lite: false,     premium: '1',        max: '2' },
     { label: 'You keep on a sale',  free: '85%',     lite: '85%',     premium: '85%',      max: '90%' },
     { label: 'Premium artworks',    free: false,     lite: false,     premium: true,       max: true },
     { label: 'Community of your own', free: 'Level 100', lite: 'Level 100', premium: 'Level 100', max: 'Included' },
@@ -145,9 +142,7 @@ function plansHtml(priced) {
         '</table>' +
       '</div>' +
       '<p class="subCmpNote">A community earned at artist Level 100 is yours for good. ' +
-      'The one included with Max stays open while the subscription does, plus three days. ' +
-      'Job postings refill once every plan month \u2014 Free and Lite read and apply to ' +
-      'every posting, but putting one up needs Premium or Max.</p>' +
+      'The one included with Max stays open while the subscription does, plus three days.</p>' +
     '</div>';
 
   return '<div class="subPgHeadline"><h2>Choose Your Plan</h2>' +

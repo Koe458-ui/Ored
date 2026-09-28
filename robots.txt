@@ -3,4 +3,4 @@ Allow: /
 
 Disallow: /api/
 
-Sitemap: https://digiartz.net/sitemap.xml
+Sitemap: https://oredlab.com/sitemap.xml

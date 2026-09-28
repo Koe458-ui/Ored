@@ -18,7 +18,6 @@ window.ZEO_DATA = {
     { id: "resources", icon: "🧰", label: "Resources",              description: "Brushes, textures, fonts, 3D, templates.",     prompt: "What do you need help with in Resources?" },
     { id: "blog",      icon: "📝", label: "Blog",                   description: "Write and read community posts.",             prompt: "What would you like to do on the Blog?" },
     { id: "marketplace",icon:"🛍️", label: "Marketplace",            description: "Buy and sell downloads, commissions, services.", prompt: "What do you need help with in the Marketplace?" },
-    { id: "jobs",      icon: "💼", label: "Jobs",                   description: "Post a role or apply to one.",                prompt: "Are you hiring, or looking for work?" },
     { id: "cart",      icon: "🛒", label: "Cart & Orders",          description: "Purchases, downloads and licenses.",          prompt: "What do you need from your Cart?" },
     { id: "community", icon: "💬", label: "Community & Chat",       description: "Communities, comments, and messages.",       prompt: "Which part of the community do you need help with?" },
     { id: "billing",   icon: "💎", label: "Subscriptions & Billing", description: "Plans, payments, cancelling.",               prompt: "What are you facing with billing or your plan?" },
@@ -82,10 +81,10 @@ Pick any of those topics from the menu and I'll guide you.`
         answer:
 `The bar across the top is the main menu. On a phone the words live behind the ☰ button; from a wide screen they sit on the bar itself.
 
-• Explore — opens a menu of the five sections: Artworks, Marketplace, Blog, Resources and Jobs
+• Explore — opens a menu of the four sections: Artworks, Marketplace, Blog and Resources
 • Communities — topic rooms you can join or create
 • Friends — your friends, your messages, and me
-• Upload — opens a menu of the five things you can post
+• Upload — opens a menu of the four things you can post
 • Profile — your account, uploads and settings (it says Sign in until you have one)
 
 Beside those: 🔍 search, 🔔 notifications and 🛒 your cart.`
@@ -553,55 +552,6 @@ Make sure the preview shows the real product.`
 `Checkout runs through our payment partner. Your payment is verified before anything unlocks, and digital files release automatically once it clears.
 
 If a charge went through but the item didn't unlock, email DigiArtzsupport@gmail.com with the details and we'll sort it out.`
-      }
-    ],
-
-    jobs: [
-      {
-        question: "What is the Jobs board?",
-        answer:
-`Explore → Jobs is where studios and creators post paid work — freelance, full-time, part-time, remote, internships, contests and collabs — and where artists find it.
-
-Tap any listing to see the full role, requirements and pay.`
-      },
-      {
-        question: "How do I apply to a job?",
-        answer:
-`1. Open the listing to read the role, requirements and pay
-2. Use the apply link or apply email shown on it
-3. Follow that studio's own steps from there
-
-Every genuine posting has a way to apply — a link or an email — so you always know where to send your work.`
-      },
-      {
-        question: "How do I post a job?",
-        answer:
-`1. Open Upload → Post a Job in the top bar
-2. Posting needs a Premium or Max subscription — without one the page offers you both plans instead of the form
-3. Add the title, company, and a description (at least 80 characters)
-4. Set the category, employment type, and location — or tick remote and list the eligible countries
-5. Add the pay range (optional) and a closing date
-6. Give a way to apply — an apply link or an email is required — then post
-
-No image needed. Postings past their closing date hide themselves automatically.`
-      },
-      {
-        question: "Who can post a job?",
-        answer:
-`Premium and Max members.
-
-• Premium — 1 posting per plan month
-• Max — 2 postings per plan month
-• Free and Lite — read and apply to every posting, but cannot put one up
-
-Your allowance refills once every plan month, and the form shows how many you have left before you start writing. A posting waiting on a scheduled publish date has already used its slot.`
-      },
-      {
-        question: "Is there a fee to post a job?",
-        answer:
-`There is no separate checkout for a posting — it is part of a subscription. Premium includes 1 posting a plan month and Max includes 2, and no image or extra payment is needed beyond that.
-
-Spam, MLM and pay-to-apply postings aren't allowed and get removed.`
       }
     ],
 

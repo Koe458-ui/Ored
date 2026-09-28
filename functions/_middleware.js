@@ -108,7 +108,7 @@ const SECTIONS = {
 
 const PROFILE_RE = /^\/profile\/([^/]+)\/?$/;
 const ARTWORK_RE = /^\/artwork\/([^/]+)\/?$/;
-const ITEM_RE    = /^\/(resource|blog|listing|job)\/([^/]+)\/?$/;
+const ITEM_RE    = /^\/(resource|blog|listing)\/([^/]+)\/?$/;
 
 const ITEMS = {
   resource: {
@@ -126,12 +126,6 @@ const ITEMS = {
     vis: 'visibility=eq.published&status=eq.approved',
     select: 'id,title,summary,preview_url,seo_title,seo_description,created_at',
     ld: 'CreativeWork'
-  },
-  job: {
-    table: 'jobs', crumb: 'Jobs',
-    vis: 'visibility=eq.public&status=eq.approved',
-    select: 'id,title,company,description,created_at',
-    ld: 'WebPage'
   }
 };
 
@@ -305,13 +299,11 @@ function sectionMeta(path, sec) {
 function itemMeta(seg, cfg, row) {
   const url = `${SITE}/${seg}/${row.id}`;
   const name = row.seo_title || row.title || 'Untitled';
-  const body = row.seo_description || row.summary || row.excerpt || row.description || '';
+  const body = row.seo_description || row.summary || row.excerpt || '';
   const img = ogImage(row.preview_url || row.cover_url || '') || '';
   const date = (row.published_at || row.created_at || '').slice(0, 10);
   const desc = clamp(body || `${name} — ${cfg.crumb.toLowerCase()} on oredlab.`);
-  const title = seg === 'job' && row.company
-    ? `${name} at ${row.company} — oredlab`
-    : `${name} — oredlab`;
+  const title = `${name} — oredlab`;
 
   return {
     title,
@@ -332,9 +324,7 @@ function itemMeta(seg, cfg, row) {
         ...(img ? { image: img } : {}),
         isPartOf: { '@type': 'WebSite', name: 'oredlab', url: `${SITE}/` }
       },
-      crumbs(cfg.parent
-        ? [{ name: cfg.crumb, url: `${SITE}${cfg.parent}` }, { name, url }]
-        : [{ name, url }])
+      crumbs([{ name: cfg.crumb, url: `${SITE}${cfg.parent}` }, { name, url }])
     ],
     ldId: 'ldItem'
   };
@@ -351,9 +341,7 @@ function unlistedMeta(seg, cfg, id) {
     ogType: 'website',
     h1: cfg.crumb,
     robots: 'noindex, follow',
-    ld: cfg.parent
-      ? crumbs([{ name: cfg.crumb, url: `${SITE}${cfg.parent}` }])
-      : crumbs([]),
+    ld: crumbs([{ name: cfg.crumb, url: `${SITE}${cfg.parent}` }]),
     ldId: 'ldItem'
   };
 }

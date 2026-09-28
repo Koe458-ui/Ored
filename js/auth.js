@@ -485,10 +485,6 @@
   window.dzIsStaff = dzIsStaff;
   window.dzIsPartner = dzIsPartner;
 
-  function dzForgetPlanCaches(){
-    if(typeof window.dzJobQuotaForget === 'function') window.dzJobQuotaForget();
-  }
-
     // Re-reads the profile, so tier and expiry come from the database rather
     // than from whatever a purchase happened to answer with. store.js has
     // called window.checkUserRole after a Max claim all along; until now
@@ -496,7 +492,7 @@
   async function checkUserRole(){
     if(!sb || !currentUser){
       isDev=false; userRole=null; userPlan=null; currentUserAvatarUrl=null;
-      dzSetPlan('guest', null); dzPaintLimits(); dzForgetPlanCaches();
+      dzSetPlan('guest', null); dzPaintLimits();
       if(typeof dzPaintAds === 'function') dzPaintAds();
       syncAdmBtn(); return;
     }
@@ -512,12 +508,11 @@
       dzSetPlan(isDev ? 'dev' : userPlan,
                 (data && data.subscription_expires_at) || null);
       dzPaintLimits();
-      dzForgetPlanCaches();
       if(typeof dzPaintAds === 'function') dzPaintAds();
     }catch(e){
       console.error(e);
       isDev=false; userRole=null; userPlan='guest'; currentUserAvatarUrl=null;
-      dzSetPlan('guest', null); dzPaintLimits(); dzForgetPlanCaches();
+      dzSetPlan('guest', null); dzPaintLimits();
       if(typeof dzPaintAds === 'function') dzPaintAds();
     }
     syncAdmBtn();
@@ -663,7 +658,7 @@
   function notifAvatar(n){
     if(!n.actor_id){
       // the site's own mark, on the URL the page already precaches
-      return '<img class="notifAv notifAv--site" src="/favicon.svg?v=4" alt="oredlab" loading="lazy" decoding="async">';
+      return '<img class="notifAv notifAv--site" src="/favicon.svg?v=5" alt="oredlab" loading="lazy" decoding="async">';
     }
     var letter = esc((n.actor_name||'?').charAt(0).toUpperCase());
     if(!n.actor_avatar) return '<span class="notifAv notifAv--txt">'+letter+'</span>';
@@ -773,7 +768,7 @@
     if(art && typeof openArtworkById === 'function'){ openArtworkById(art[1], true); return; }
     var pro = url.match(/^\/profile\/([^/]+)\/?$/);
     if(pro && typeof openProfileByUsername === 'function'){ openProfileByUsername(pro[1], true); return; }
-    var item = url.match(/^\/(resource|blog|listing|job)\/([^/]+)\/?$/);
+    var item = url.match(/^\/(resource|blog|listing)\/([^/]+)\/?$/);
     if(item && typeof window.dzOpenById === 'function'){ window.dzOpenById(item[1], item[2]); return; }
     if(typeof window.dzRouteGo === 'function' && window.dzRouteGo(url)) return;
     try{ window.location.href = url; }catch(e){}

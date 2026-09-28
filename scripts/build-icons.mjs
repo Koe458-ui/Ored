@@ -8,137 +8,40 @@ import sharp from 'sharp';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const out = (name) => join(root, name);
 
-const ICON = 0.72;
-const TAB  = 0.82;
-const SAFE = 0.58;
+// The mark: two arcs of a ring, orange lower-left, red upper-right, on a 512 grid
+const MARK =
+  '<path fill="#FF6A00" d="M405.30 433.58A232 232 0 0 1 78.42 106.70L163.93 192.22A112 112 0 0 0 319.78 348.07Z"/>' +
+  '<path fill="#FF1F2D" d="M106.70 78.42A232 232 0 0 1 433.58 405.30L348.07 319.78A112 112 0 0 0 192.22 163.93Z"/>';
 
-const SLOPE = 3 / 11;
-const PITCH = 242.5;
-const WIDTH = 176;
-const LIFT  = { x: 10, y: 8 };
+const SIZE = 512;
+const RING = 232;
 
-const MID_Y = 512;
-const BARS = [
-  { cx: 0 * PITCH, half: 264, tone: 'Blk' },
-  { cx: 1 * PITCH, half: 330, tone: 'Red' },
-  { cx: 2 * PITCH, half: 330, tone: 'Blk' },
-  { cx: 3 * PITCH, half: 264, tone: 'Red' },
-];
+const ICON = 0.84;
+const SAFE = 0.8;
 
-const ends = (b) => ({
-  x1: b.cx + SLOPE * b.half, y1: MID_Y - b.half,
-  x2: b.cx - SLOPE * b.half, y2: MID_Y + b.half,
-});
-
-const inked = (() => {
-  const r = WIDTH / 2;
-  const xs = BARS.flatMap((b) => { const e = ends(b); return [e.x1, e.x2]; });
-  const ys = BARS.flatMap((b) => { const e = ends(b); return [e.y1, e.y2]; });
-  const minX = Math.min(...xs) - r,  maxX = Math.max(...xs) + r + LIFT.x;
-  const minY = Math.min(...ys) - r,  maxY = Math.max(...ys) + r + LIFT.y;
-  return {
-    minX, maxX, minY, maxY,
-    cx: (minX + maxX) / 2, cy: (minY + maxY) / 2,
-    radius: Math.hypot((maxX - minX) / 2, (maxY - minY) / 2),
-  };
-})();
-const CX = inked.cx;
-const CY = inked.cy;
-
-if (SAFE * inked.radius > 409.6) {
-  throw new Error(`SAFE ${SAFE} puts the mark ${(SAFE * inked.radius).toFixed(1)} units ` +
-    `from centre; the maskable safe circle is 409.6. Lower SAFE to ` +
-    `${(409.6 / inked.radius).toFixed(3)} or less.`);
+if (SAFE * RING > 0.4 * SIZE) {
+  throw new Error(`SAFE ${SAFE} puts the ring ${(SAFE * RING).toFixed(1)} units from centre; ` +
+    `the maskable safe circle is ${0.4 * SIZE}.`);
 }
 
-const TONES = {
-  Red: { face: [[0, '#ff4d3f'], [0.35, '#ee1111'], [0.72, '#cc0000'],
-                [1, '#8e0000']],
-         side: [[0, '#7a0000'], [1, '#340000']],
-         gloss: 0.18 },
-  Blk: { face: [[0, '#4a4a4a'], [0.35, '#242424'], [0.72, '#111111'],
-                [1, '#050505']],
-         side: [[0, '#171717'], [1, '#000000']],
-         gloss: 0.1 },
-};
-
-const stops = (list) =>
-  list.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('');
-
-const n = (v) => String(Math.round(v * 100) / 100);
-
-const GLOSS_RUN = 0.3;
-const defs = BARS.map((b, i) => {
-  const e = ends(b);
-  const t = TONES[b.tone];
-  return `
-    <linearGradient id="dzFace${i}" gradientUnits="userSpaceOnUse" x1="${n(e.x1)}" y1="${n(e.y1)}" x2="${n(e.x2)}" y2="${n(e.y2)}">
-      ${stops(t.face)}
-    </linearGradient>
-    <linearGradient id="dzSide${i}" gradientUnits="userSpaceOnUse" x1="${n(e.x1)}" y1="${n(e.y1)}" x2="${n(e.x2)}" y2="${n(e.y2)}">
-      ${stops(t.side)}
-    </linearGradient>
-    <linearGradient id="dzGloss${i}" gradientUnits="userSpaceOnUse" x1="0" y1="${n(e.y1)}" x2="0" y2="${n(e.y1 + (e.y2 - e.y1) * GLOSS_RUN)}">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="${t.gloss}"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>`;
-}).join('');
-
-const BLUR = 13;
-const CAST = { x: 7, y: 12 };
-const region = (() => {
-  const pad = BLUR * 3;
-  const x = Math.floor(inked.minX - pad);
-  const y = Math.floor(inked.minY - pad);
-  return {
-    x, y,
-    w: Math.ceil(inked.maxX + CAST.x + pad - x),
-    h: Math.ceil(inked.maxY + CAST.y + pad - y),
-  };
-})();
-const shadow = `
-    <filter id="dzShadow" filterUnits="userSpaceOnUse" x="${region.x}" y="${region.y}" width="${region.w}" height="${region.h}" color-interpolation-filters="sRGB">
-      <feOffset in="SourceAlpha" dx="${CAST.x}" dy="${CAST.y}" result="dzOff"/>
-      <feGaussianBlur in="dzOff" stdDeviation="${BLUR}" result="dzBlur"/>
-      <feFlood flood-color="#000000" flood-opacity="0.2" result="dzInk"/>
-      <feComposite in="dzInk" in2="dzBlur" operator="in" result="dzCast"/>
-      <feMerge><feMergeNode in="dzCast"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>`;
-
-const bars = BARS.map((b, i) => {
-  const e = ends(b);
-  return `
-    <line x1="${n(e.x1 + LIFT.x)}" y1="${n(e.y1 + LIFT.y)}" x2="${n(e.x2 + LIFT.x)}" y2="${n(e.y2 + LIFT.y)}" stroke="url(#dzSide${i})" stroke-width="${WIDTH}"/>
-    <line x1="${n(e.x1)}" y1="${n(e.y1)}" x2="${n(e.x2)}" y2="${n(e.y2)}" stroke="url(#dzFace${i})" stroke-width="${WIDTH}"/>
-    <line x1="${n(e.x1)}" y1="${n(e.y1)}" x2="${n(e.x2)}" y2="${n(e.y2)}" stroke="url(#dzGloss${i})" stroke-width="${WIDTH}"/>`;
-}).join('');
-
-function svg({ size = 1024, scale = ICON, ground = 'square', shadowed = true, title }) {
-  const half = size / 2;
-  const bg =
-    ground === 'none' ? ''
-    : `<rect x="0" y="0" width="${size}" height="${size}" fill="#ffffff"/>`;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="${title}" shape-rendering="geometricPrecision">
-  <title>${title}</title>
-  <defs>${defs}${shadowed ? shadow : ''}
-  </defs>
-  ${bg}
-  <g transform="translate(${half},${half}) scale(${scale}) translate(${n(-CX)},${n(-CY)})"${shadowed ? ' filter="url(#dzShadow)"' : ''} stroke-linecap="round">${bars}
-  </g>
-</svg>
-`;
+function svg({ scale = 1, ground = false } = {}) {
+  const half = SIZE / 2;
+  const bg = ground ? `<rect width="${SIZE}" height="${SIZE}" fill="#FFFFFF"/>` : '';
+  const body = scale === 1
+    ? MARK
+    : `<g transform="translate(${half} ${half}) scale(${scale}) translate(${-half} ${-half})">${MARK}</g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SIZE} ${SIZE}">${bg}${body}</svg>`;
 }
 
-const logoSvg = svg({ scale: ICON, ground: 'none', title: 'oredlab' });
-const iconSvg = svg({ scale: ICON, title: 'oredlab' });
-const tabSvg = svg({ scale: TAB, shadowed: false, title: 'oredlab' });
-const maskSvg = svg({ scale: SAFE, title: 'oredlab' });
+const tabSvg = svg();
+const iconSvg = svg({ scale: ICON, ground: true });
+const maskSvg = svg({ scale: SAFE, ground: true });
 
-writeFileSync(out('logo.svg'), logoSvg);
 writeFileSync(out('favicon.svg'), tabSvg);
+writeFileSync(out('logo.svg'), tabSvg + '\n');
 
 const render = (source, px) =>
-  sharp(Buffer.from(source), { density: Math.max(1, Math.round((96 * px) / 1024)) })
+  sharp(Buffer.from(source))
     .resize(px, px, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png({ compressionLevel: 9, palette: false });
 
@@ -151,7 +54,7 @@ await flat(maskSvg, 512).toFile(out('icon-maskable-512.png'));
 
 const ICO_SIZES = [16, 32, 48, 64, 128];
 const frames = await Promise.all(
-  ICO_SIZES.map((px) => flat(tabSvg, px).toBuffer())
+  ICO_SIZES.map((px) => render(tabSvg, px).toBuffer())
 );
 
 const header = Buffer.alloc(6);

@@ -100,11 +100,11 @@
     var rows = {};
     if(want('artwork')) rows.artwork = fgSearchArtworks(raw);
 
-    function fgSearchJobs(){
-      var jobs = [];
+    function fgSearchQueries(){
+      var tasks = [];
       if(sb && pattern){
         if(want('marketplace')){
-          jobs.push(sb.from('marketplace_items')
+          tasks.push(sb.from('marketplace_items')
             .select(typeof window.dzSelectFor === 'function' ? window.dzSelectFor('marketplace')
               : 'id,user_id,title,description,category,tags,item_type,currency,file_ext,file_size,preview_url,license,delivery_days,created_at')
             .eq('status','approved').eq('visibility','published').ilike('title',pattern)
@@ -112,7 +112,7 @@
             .then(fgSrchRows('marketplace')));
         }
         if(want('blog')){
-          jobs.push(sb.from('blog_posts')
+          tasks.push(sb.from('blog_posts')
             .select('id,user_id,title,slug,excerpt,body,cover_url,category,tags,read_minutes,'+
                     'content_type,featured,published_at,created_at')
             .eq('status','approved').eq('visibility','published').ilike('title',pattern)
@@ -120,7 +120,7 @@
             .then(fgSrchRows('blog')));
         }
         if(want('resources')){
-          jobs.push(sb.from('resources')
+          tasks.push(sb.from('resources')
             .select('id,user_id,title,summary,description,resource_type,category,tags,'+
                     'file_name,file_ext,file_size,file_count,preview_url,license,'+
                     'featured,download_count,created_at')
@@ -130,14 +130,14 @@
         }
         if(want('artist')){
           var who = fgArtistPattern(raw);
-          jobs.push(sb.from('profiles')
+          tasks.push(sb.from('profiles')
             .select(window.DZ_ARTIST_COLS || 'id,username,display_name,avatar_url,banner_url,bio,follower_count')
             .or('username.ilike.'+who+',display_name.ilike.'+who)
             .order('username',{ascending:true}).limit(24)
             .then(fgSrchRows('artist')));
         }
       }
-      return jobs;
+      return tasks;
     }
     var fgSearchWanted = !!(sb && pattern) &&
       (want('artist') || want('marketplace') || want('blog') || want('resources'));
@@ -151,8 +151,8 @@
         : null;
       try{
         out = (cSrch && srchKey && raw.length >= 2)
-          ? await cSrch.getOrSet(srchKey, function(){ return Promise.all(fgSearchJobs()); }, 'search')
-          : await Promise.all(fgSearchJobs());
+          ? await cSrch.getOrSet(srchKey, function(){ return Promise.all(fgSearchQueries()); }, 'search')
+          : await Promise.all(fgSearchQueries());
       }
       catch(e){
         if(mySeq !== fgSrch.seq) return;
