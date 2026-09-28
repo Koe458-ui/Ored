@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 import urllib.error
 import urllib.parse
@@ -26,6 +27,10 @@ DEFAULT_BUCKET = "ored-checkpoints"
 TIMEOUT_SECONDS = 120
 READ_CHUNK = 1024 * 1024
 LIST_PAGE = 1000
+# The Supabase Free plan caps every stored object at 50 MB whatever the bucket
+# says, so larger files are stored as numbered parts next to the logical path.
+MAX_OBJECT_BYTES = 45 * 1024 * 1024
+PART_SUFFIX = re.compile(r"^(?P<name>.+)\.part(?P<index>\d{5})$")
 
 
 class ObjectExistsError(StoreError):
@@ -65,13 +70,17 @@ class CheckpointStore:
         service_key: str,
         bucket: str = DEFAULT_BUCKET,
         timeout: int = TIMEOUT_SECONDS,
+        max_object_bytes: int = MAX_OBJECT_BYTES,
     ) -> None:
         if not url or not service_key:
             raise StoreError("CheckpointStore needs a project url and a service key")
+        if max_object_bytes < 1:
+            raise StoreError("max_object_bytes must be positive")
         self.base = url.rstrip("/") + "/storage/v1"
         self.service_key = service_key
         self.bucket = bucket
         self.timeout = timeout
+        self.max_object_bytes = max_object_bytes
 
     @classmethod
     def from_env(cls) -> "CheckpointStore":
@@ -82,7 +91,7 @@ class CheckpointStore:
             raise StoreError(
                 "set ORED_SB_URL and ORED_SB_SERVICE_KEY to reach checkpoint storage"
             )
-        return cls(url, key, bucket)
+        return cls(url, key, bucket, max_object_bytes=max_object_bytes_from_env())
 
     def _object_url(self, object_path: str) -> str:
         quoted = "/".join(urllib.parse.quote(p) for p in object_path.strip("/").split("/"))
@@ -108,38 +117,91 @@ class CheckpointStore:
             detail = exc.read().decode("utf-8", "replace")[:300]
             if exc.code == 409 or "Duplicate" in detail or "already exists" in detail:
                 raise ObjectExistsError(f"{method} {url} -> {exc.code} {detail}") from exc
+            if exc.code == 413 or "EntityTooLarge" in detail or "Payload too large" in detail:
+                raise StoreError(
+                    f"{method} {url} -> {exc.code} {detail} (the project's per-file limit is lower "
+                    f"than {self.max_object_bytes} bytes; lower ORED_SB_MAX_OBJECT_MB)"
+                ) from exc
             raise StoreError(f"{method} {url} -> {exc.code} {detail}") from exc
         except urllib.error.URLError as exc:
             raise StoreError(f"{method} {url} could not be reached: {exc.reason}") from exc
+
+    def _put(self, object_path: str, data: bytes, upsert: bool) -> None:
+        self._send(
+            "POST",
+            self._object_url(object_path),
+            data=data,
+            headers={
+                "content-type": "application/octet-stream",
+                "x-upsert": "true" if upsert else "false",
+            },
+        )
+
+    def _entries(self, object_path: str) -> Tuple[Optional[int], List[Tuple[str, int]]]:
+        """Size of the whole object (None if absent) and its parts, in order."""
+        folder, _, name = object_path.strip("/").rpartition("/")
+        whole: Optional[int] = None
+        parts: Dict[int, Tuple[str, int]] = {}
+        for item in self._list(folder, name):
+            if not item.get("id"):
+                continue
+            size = int((item.get("metadata") or {}).get("size") or 0)
+            if item.get("name") == name:
+                whole = size
+                continue
+            match = PART_SUFFIX.match(item.get("name") or "")
+            if match and match.group("name") == name:
+                path = f"{folder}/{item['name']}".strip("/")
+                parts[int(match.group("index"))] = (path, size)
+        return whole, [parts[i] for i in sorted(parts)]
 
     def upload(self, path: str | Path, object_path: str, upsert: bool = False) -> Dict[str, Any]:
         path = Path(path)
         if not path.is_file():
             raise StoreError(f"checkpoint not found: {path}")
         size = path.stat().st_size
-        with open(path, "rb") as handle:
-            self._send(
-                "POST",
-                self._object_url(object_path),
-                data=handle.read(),
-                headers={
-                    "content-type": "application/octet-stream",
-                    "x-upsert": "true" if upsert else "false",
-                },
-            )
+        if size <= self.max_object_bytes:
+            if upsert:
+                for part, _ in self._entries(object_path)[1]:
+                    self._send("DELETE", self._object_url(part))
+            with open(path, "rb") as handle:
+                self._put(object_path, handle.read(), upsert)
+        else:
+            whole, old_parts = self._entries(object_path)
+            if (whole is not None or old_parts) and not upsert:
+                raise ObjectExistsError(f"{object_path} already exists")
+            count = 0
+            with open(path, "rb") as handle:
+                for chunk in iter(lambda: handle.read(self.max_object_bytes), b""):
+                    self._put(part_path(object_path, count), chunk, upsert)
+                    count += 1
+            stale = [p for p, _ in old_parts if int(PART_SUFFIX.match(p).group("index")) >= count]
+            if whole is not None:
+                stale.append(object_path)
+            for extra in stale:
+                self._send("DELETE", self._object_url(extra))
         return {"object_path": object_path, "size_bytes": size, "sha256": digest(path)}
 
     def download(self, object_path: str, path: str | Path) -> Path:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        raw = self._send("GET", self._object_url(object_path))
         tmp = path.with_suffix(path.suffix + ".part")
-        tmp.write_bytes(raw)
+        whole, parts = self._entries(object_path)
+        if whole is None and parts:
+            with open(tmp, "wb") as handle:
+                for part, _ in parts:
+                    handle.write(self._send("GET", self._object_url(part)))
+        else:
+            tmp.write_bytes(self._send("GET", self._object_url(object_path)))
         tmp.replace(path)
         return path
 
     def remove(self, object_path: str) -> None:
-        self._send("DELETE", self._object_url(object_path))
+        whole, parts = self._entries(object_path)
+        if whole is not None or not parts:
+            self._send("DELETE", self._object_url(object_path))
+        for part, _ in parts:
+            self._send("DELETE", self._object_url(part))
 
     def _list(self, prefix: str, search: str = "") -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []
@@ -162,10 +224,11 @@ class CheckpointStore:
             offset += LIST_PAGE
 
     def stat(self, object_path: str) -> Optional[int]:
-        folder, _, name = object_path.strip("/").rpartition("/")
-        for item in self._list(folder, name):
-            if item.get("name") == name and item.get("id"):
-                return int((item.get("metadata") or {}).get("size") or 0)
+        whole, parts = self._entries(object_path)
+        if whole is not None:
+            return whole
+        if parts:
+            return sum(size for _, size in parts)
         return None
 
     def list_objects(self, prefix: str = "") -> Dict[str, int]:
@@ -173,10 +236,31 @@ class CheckpointStore:
         for item in self._list(prefix.strip("/")):
             path = f"{prefix.strip('/')}/{item['name']}".strip("/")
             if item.get("id"):
-                found[path] = int((item.get("metadata") or {}).get("size") or 0)
+                size = int((item.get("metadata") or {}).get("size") or 0)
+                match = PART_SUFFIX.match(path)
+                if match:
+                    path = match.group("name")
+                found[path] = found.get(path, 0) + size
             else:
                 found.update(self.list_objects(path))
         return found
+
+
+def part_path(object_path: str, index: int) -> str:
+    return f"{object_path}.part{int(index):05d}"
+
+
+def max_object_bytes_from_env() -> int:
+    raw = os.environ.get("ORED_SB_MAX_OBJECT_MB", "").strip()
+    if not raw:
+        return MAX_OBJECT_BYTES
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise StoreError(f"ORED_SB_MAX_OBJECT_MB must be a number, got {raw!r}") from exc
+    if value <= 0:
+        raise StoreError(f"ORED_SB_MAX_OBJECT_MB must be positive, got {raw!r}")
+    return int(value * 1024 * 1024)
 
 
 def safe_name(run_name: str) -> str:

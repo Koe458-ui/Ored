@@ -68,6 +68,14 @@ ored-checkpoints/
     export/epoch_0020_step_00049140.pt
 ```
 
+Files larger than 45 MiB are stored as numbered parts next to their logical
+name (`best/epoch_0020_step_00049140.pt.part00000`, `.part00001`, ...), because
+the Supabase Free plan rejects any single object over 50 MB with `413
+EntityTooLarge` no matter what the bucket's own limit says. Rows, `stat`,
+download, verify and delete all use the logical name and handle the parts
+transparently. Set `ORED_SB_MAX_OBJECT_MB` to change the part size (for example
+on a paid plan with a higher global limit).
+
 Names say what the file is, and a file is **never overwritten** once a row
 records it. That is why live and best are not literally `live.pt` and `best.pt`
 in the bucket: replacing an object in place cannot happen in the same
