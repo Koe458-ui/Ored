@@ -382,12 +382,15 @@ def corpus_directory(cfg: Config) -> Path:
 
 
 def dataset_files_from_env() -> Any:
-    from ored.learning.checkpoints import CheckpointStore
+    from ored.learning.checkpoints import CheckpointStore, max_object_bytes_from_env
+    from ored.learning.r2 import R2Store, r2_configured
 
     url = os.environ.get("ORED_SB_URL", "")
     key = os.environ.get("ORED_SB_SERVICE_KEY", "")
     bucket = os.environ.get("ORED_SB_DATASET_BUCKET", DATASET_BUCKET)
-    return CheckpointStore(url, key, bucket)
+    if r2_configured():
+        return R2Store.from_env(bucket)
+    return CheckpointStore(url, key, bucket, max_object_bytes=max_object_bytes_from_env())
 
 
 def storage_prefix(snapshot: Snapshot) -> str:
