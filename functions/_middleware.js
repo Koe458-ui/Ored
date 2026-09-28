@@ -1,5 +1,5 @@
 import { underEdgeLimit, tooManyRequests } from './lib/ratelimit.js';
-import { sbUrl, sbAnon, SB_SIZE_RE } from './lib/sb.js';
+import { sbUrl, sbAnon, SB_SIZE_RE, SB_URL_FALLBACK, SB_ANON_FALLBACK } from './lib/sb.js';
 import { SITE, UUID_RE, esc } from './lib/http.js';
 import { REPORT_ONLY_CSP } from './lib/csp.js';
 
@@ -32,11 +32,15 @@ function clamp(s, n = 160) {
   return t.length <= n ? t : t.slice(0, n - 1).replace(/\s\S*$/, '') + '…';
 }
 
-const sbReady = (env) => !!(env && sbUrl(env) && sbAnon(env));
+  // The URL and publishable key are public (every browser gets them), so a Worker
+  // with no variables set still renders live rows instead of the grid baked into index.html
+const pubUrl = (env) => String(sbUrl(env || {}) || SB_URL_FALLBACK).replace(/\/$/, '');
+const pubKey = (env) => sbAnon(env || {}) || SB_ANON_FALLBACK;
+const sbReady = (env) => !!(pubUrl(env) && pubKey(env));
 
 async function sbGet(env, query, ttl) {
-  const res = await fetch(`${sbUrl(env)}/rest/v1/${query}`, {
-    headers: { apikey: sbAnon(env), authorization: `Bearer ${sbAnon(env)}` },
+  const res = await fetch(`${pubUrl(env)}/rest/v1/${query}`, {
+    headers: { apikey: pubKey(env), authorization: `Bearer ${pubKey(env)}` },
     cf: { cacheTtl: ttl, cacheEverything: true }
   });
   if (!res.ok) throw new Error('sb ' + res.status);
@@ -388,11 +392,34 @@ function applyMeta(rw, m) {
   return rw;
 }
 
+// config.js is gitignored, so a build from the repo has none: the asset request 404s and a
+// visitor without a service-worker copy gets no backend at all. Written here from the
+// Worker's variables it exists on every deploy, whatever the build step does.
+function configScript(env) {
+  const e = env || {};
+  const url = pubUrl(e);
+  const cfg = {
+    SB_URL: url,
+    SB_KEY: pubKey(e),
+    S3_FN_URL: e.S3_FN_URL || `${url}/functions/v1/smart-function`,
+    T600_READY: e.T600_READY == null ? true : flagOn(e.T600_READY),
+    TURNSTILE_SITE_KEY: e.TURNSTILE_SITE_KEY || ''
+  };
+  return new Response(`window.KOE_CONFIG = ${JSON.stringify(cfg, null, 2)};\n`, {
+    headers: {
+      'content-type': 'application/javascript; charset=utf-8',
+      'cache-control': 'public, max-age=300, must-revalidate'
+    }
+  });
+}
+
 async function render(context) {
   const { env, request, next } = context;
 
   let reqPath = '/';
   try { reqPath = new URL(request.url).pathname; } catch {   }
+
+  if (reqPath === '/config.js') return configScript(env);
 
   if (reqPath.startsWith('/api/')) {
     if (!(await underEdgeLimit(env, request, reqPath))) return tooManyRequests();
