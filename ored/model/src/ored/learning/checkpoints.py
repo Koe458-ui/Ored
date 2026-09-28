@@ -84,9 +84,13 @@ class CheckpointStore:
 
     @classmethod
     def from_env(cls) -> "CheckpointStore":
+        from ored.learning.r2 import R2Store, r2_configured
+
         url = os.environ.get("ORED_SB_URL", "")
         key = os.environ.get("ORED_SB_SERVICE_KEY", "")
         bucket = os.environ.get("ORED_SB_CHECKPOINT_BUCKET", DEFAULT_BUCKET)
+        if r2_configured():
+            return R2Store.from_env(bucket)
         if not url or not key:
             raise StoreError(
                 "set ORED_SB_URL and ORED_SB_SERVICE_KEY to reach checkpoint storage"
