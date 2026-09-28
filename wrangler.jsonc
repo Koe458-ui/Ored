@@ -1,0 +1,21 @@
+{
+  // Workers Builds deploys this repo with `npx wrangler deploy`.
+  // The site is static files at the repo root plus the Pages-style
+  // functions/ directory, which the build step compiles into one Worker.
+  "name": "artz",
+  "compatibility_date": "2026-09-01",
+  "main": "dist/worker/index.js",
+  "build": {
+    "command": "npx wrangler pages functions build functions --outdir dist/worker"
+  },
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    // unknown paths get index.html, as Pages did with no 404.html
+    "not_found_handling": "single-page-application",
+    // functions/_middleware.js must see every request, as it did on Pages
+    "run_worker_first": true
+  },
+  // keep the variables and secrets set in the Cloudflare dashboard
+  "keep_vars": true
+}
