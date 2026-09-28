@@ -2,7 +2,7 @@
   // Workers Builds deploys this repo with `npx wrangler deploy`.
   // The site is static files at the repo root plus the Pages-style
   // functions/ directory, which the build step compiles into one Worker.
-  "name": "ored",
+  "name": "artz",
   "compatibility_date": "2026-09-01",
   "main": "dist/worker/index.js",
   "build": {
