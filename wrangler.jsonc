@@ -17,5 +17,8 @@
     "run_worker_first": true
   },
   // keep the variables and secrets set in the Cloudflare dashboard
-  "keep_vars": true
+  "keep_vars": true,
+  // Workers Builds runs `wrangler preview` for every non-production branch, and that
+  // command refuses a config with no previews block. Empty: Previews use the top-level settings
+  "previews": {}
 }
