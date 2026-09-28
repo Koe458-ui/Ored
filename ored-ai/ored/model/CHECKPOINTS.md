@@ -68,6 +68,34 @@ ored-checkpoints/
     export/epoch_0020_step_00049140.pt
 ```
 
+### Cloudflare R2
+
+When `ORED_R2_ACCOUNT_ID`, `ORED_R2_ACCESS_KEY_ID` and `ORED_R2_SECRET_ACCESS_KEY`
+are set, checkpoint and dataset files go to the Cloudflare R2 buckets of the same
+names (`ored-checkpoints`, `ored-datasets`) instead of Supabase Storage. Object
+paths are identical, so the checkpoint rows in Postgres (which stay on Supabase)
+need no change. One R2 upload takes up to 5 GiB, so nothing is split.
+
+To move existing files, with both the `ORED_SB_*` and `ORED_R2_*` variables set:
+
+```
+ored-checkpoints migrate-to-r2 --dry-run   # list what would be copied
+ored-checkpoints migrate-to-r2             # copy, checking each checkpoint's sha256 against its row
+```
+
+The copy is safe to re-run: files already in R2 at the right size are skipped.
+Supabase Storage is left untouched; delete it by hand once R2 is in use.
+
+### Supabase Storage size limit
+
+Files larger than 45 MiB are stored as numbered parts next to their logical
+name (`best/epoch_0020_step_00049140.pt.part00000`, `.part00001`, ...), because
+the Supabase Free plan rejects any single object over 50 MB with `413
+EntityTooLarge` no matter what the bucket's own limit says. Rows, `stat`,
+download, verify and delete all use the logical name and handle the parts
+transparently. Set `ORED_SB_MAX_OBJECT_MB` to change the part size (for example
+on a paid plan with a higher global limit).
+
 Names say what the file is, and a file is **never overwritten** once a row
 records it. That is why live and best are not literally `live.pt` and `best.pt`
 in the bucket: replacing an object in place cannot happen in the same

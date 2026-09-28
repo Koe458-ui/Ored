@@ -1152,6 +1152,10 @@ here reads a table belonging to another product, and the only schema outside
 | `ORED_SB_SERVICE_KEY` | trainer, exporter, checkpoint CLI, serving, web backend | **yes — server only** |
 | `ORED_SB_CHECKPOINT_BUCKET` | checkpoint storage, default `ored-checkpoints` | no |
 | `ORED_SB_DATASET_BUCKET` | training-data snapshots, default `ored-datasets` | no |
+| `ORED_R2_ACCOUNT_ID` | when set, checkpoint and dataset files use Cloudflare R2 instead of Supabase Storage | no |
+| `ORED_R2_ACCESS_KEY_ID` | R2 API token access key (Object Read & Write) | **yes — server only** |
+| `ORED_R2_SECRET_ACCESS_KEY` | R2 API token secret | **yes — server only** |
+| `ORED_SB_MAX_OBJECT_MB` | largest single Storage object; bigger files are split into parts, default `45` | no |
 | `ORED_AUTH_URL` | web backend, to verify a DigiArtz token | no |
 | `ORED_AUTH_KEY` | web backend, publishable key of the DigiArtz project | no |
 | `ORED_ALLOWED_ORIGINS` | web backend, extra origins allowed to post | no |

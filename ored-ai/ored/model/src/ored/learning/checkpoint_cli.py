@@ -427,6 +427,40 @@ def cmd_pull(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_migrate_to_r2(args: argparse.Namespace) -> int:
+    import os
+
+    from ored.data.snapshot import DATASET_BUCKET
+    from ored.learning.checkpoints import DEFAULT_BUCKET, max_object_bytes_from_env
+    from ored.learning.r2 import R2Store, copy_bucket
+
+    url = os.environ.get("ORED_SB_URL", "")
+    key = os.environ.get("ORED_SB_SERVICE_KEY", "")
+    store = SupabaseStore.from_env()
+    expected = {r.object_path: r.sha256 for r in store.checkpoints() if r.sha256}
+    buckets = [
+        (os.environ.get("ORED_SB_CHECKPOINT_BUCKET", DEFAULT_BUCKET), expected),
+        (os.environ.get("ORED_SB_DATASET_BUCKET", DATASET_BUCKET), {}),
+    ]
+    failed = 0
+    for bucket, sums in buckets:
+        source = CheckpointStore(url, key, bucket, max_object_bytes=max_object_bytes_from_env())
+        target = R2Store.from_env(bucket)
+        report = copy_bucket(source, target, dry_run=args.dry_run, expected=sums)
+        verb = "would copy" if args.dry_run else "copied"
+        print(f"{bucket}: {verb} {len(report['copied'])}, already in R2 {len(report['skipped'])}, "
+              f"failed {len(report['failed'])}")
+        for path in report["copied"]:
+            print(f"  {verb}  {path}")
+        for problem in report["failed"]:
+            print(f"  FAILED  {problem}")
+        failed += len(report["failed"])
+    if not failed and not args.dry_run:
+        print("Every object is in R2. Set ORED_R2_* on every machine to switch over; "
+              "Supabase Storage is left untouched.")
+    return 1 if failed else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="checkpoints",
@@ -541,6 +575,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--kind", default="best", choices=KINDS)
     p.add_argument("--run-name", default="")
     p.set_defaults(func=cmd_pull)
+
+    p = sub.add_parser("migrate-to-r2",
+                       help="copy every checkpoint and dataset file from Supabase Storage to R2, same names")
+    p.add_argument("--dry-run", action="store_true", help="list what would be copied")
+    p.set_defaults(func=cmd_migrate_to_r2)
 
     return parser
 
