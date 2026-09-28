@@ -1,0 +1,13 @@
+.git
+.github
+.gitignore
+.assetsignore
+.wrangler
+node_modules
+dist
+functions
+scripts
+security
+supabase
+wrangler.jsonc
+*.md
