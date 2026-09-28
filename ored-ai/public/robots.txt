@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /ored/model/
+
+Sitemap: https://ored.digiartz.net/sitemap.xml
