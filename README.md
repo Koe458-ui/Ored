@@ -15,32 +15,36 @@
 <h1 align="center">Ored - the art community</h1>
 <p align="center">oredlab is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves</p>
 
-## 🌐 Live Site
-https://oredlab.com
+<h1 align="center">Live site</h1>
+<p align="center">https://oredlab.com</p>
 
-## ✨ Features
-- Dynamic gallery with Supabase backend
-- Subscription tiers (Lite / Premium / Max)
-- Comment systems
-- Follow artists, with a personalised Following feed
-- Communities, friends & merit system
+<h1 align="center">Features</h1>
+<p align="center">
+  - Dynamic gallery and profile view.
+  - Artist follow, like , messages ,etc
+  
+  - Communities, friends, merit system and many more.
+  - No AI art , only human art
+</p>
 
-## 🪪 License
-
-Copyright © 2026 KOE
-
-OredLab — https://oredlab.com
+<h1 align="center">Licence</h1>
+<p align="center">Copyright © 2026 OREDLAB
 
 Licensed under the Apache License, Version 2.0.
 
 You may use, modify, and distribute this project in accordance with the terms of the Apache License 2.0.
 
 See the ""LICENSE"" (LICENSE) file for the complete license terms.
+</p>
 
-## 👥 Team
-The oredlab Team — oredlab.com
+<h1 align="center">Team</h1>
+<p align="center">The oredlab Team — oredlab.com
 
-Albaze , Deepak and Koe
+ Albaze 
+ Deepak
+ Koe
+</p>
+
 
 
 
