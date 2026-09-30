@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/logo.svg" width="120" alt="Logo">
+</p>
+
 # oredlab
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python&logoColor=white)](https://www.python.org/)
