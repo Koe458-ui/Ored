@@ -11,10 +11,17 @@ https://oredlab.com
 - Follow artists, with a personalised Following feed
 - Communities, friends & merit system
 
-## 🛠 Built With
-- HTML / CSS / JavaScript (single-file)
-- Supabase (database and storage)
-- Cloudflare Pages (hosting)
+## 🪪 License
+
+Copyright © 2026 KOE
+
+OredLab — https://oredlab.com
+
+Licensed under the Apache License, Version 2.0.
+
+You may use, modify, and distribute this project in accordance with the terms of the Apache License 2.0.
+
+See the ""LICENSE"" (LICENSE) file for the complete license terms.
 
 ## 👥 Team
 The oredlab Team — oredlab.com
