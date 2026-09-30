@@ -2,7 +2,8 @@
   <img src="./assets/logo.svg" width="120" alt="Logo">
 </p>
 
-# oredlab
+<h1 align="center">Oredlab</h1>
+<p align="center">Developer • AI • Digital Art</p>
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6%2B-yellow?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
