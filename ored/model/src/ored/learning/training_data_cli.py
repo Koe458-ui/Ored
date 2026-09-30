@@ -313,7 +313,13 @@ def cmd_lineage(args: argparse.Namespace, store: Any) -> int:
         logger.info("dataset       : not recorded (this checkpoint predates dataset tracking)")
         return 0
     if dataset.get("source") == "generated":
-        logger.info(f"dataset       : the generated corpus in {dataset.get('corpus_dir')} (not Supabase data)")
+        logger.info(f"dataset       : the generated corpus in {dataset.get('corpus_dir')} (NOT Supabase data)")
+        if dataset.get("corpus_sha256"):
+            logger.info(f"corpus sha256 : {dataset['corpus_sha256']}")
+            logger.info(f"lines         : {dataset.get('records')} in train/val/test, "
+                        f"facts {(dataset.get('facts') or {}).get('count', 0)}")
+            logger.info(f"git commit    : {dataset.get('git_commit')}"
+                        + (" (with uncommitted changes)" if dataset.get("git_dirty") else ""))
         return 0
     logger.info(f"dataset       : {dataset.get('dataset_tag') or (row.name if row else '?')}"
                 + (f" v{row.version} (ored_datasets {row.id})" if row else ""))

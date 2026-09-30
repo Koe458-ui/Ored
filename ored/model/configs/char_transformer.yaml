@@ -4,7 +4,7 @@ seed: 1337
 deterministic: true
 
 data:
-  source: generated
+  source: supabase
   tokenizer: char
   block_size: 512
   stride: 256
@@ -21,7 +21,7 @@ data:
       test: 0.15
     val_test_fraction: 0.15
   supabase:
-    dataset_tag: ""
+    dataset_tag: all
     types: []
     categories: []
     subjects: []

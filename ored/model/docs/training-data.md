@@ -27,8 +27,15 @@ ored_checkpoints rows (session_id) ──► ored_model_versions (candidate, nev
 
 The conversation-learning path (`ored_conversations` → `ored_learning_candidates`
 → `ored_training_examples`) is untouched and separate. The generated corpus
-(`scripts/generate_corpus.py`) still works exactly as before and is still the
-default: `data.source: generated`.
+(`scripts/generate_corpus.py`) still works exactly as before, but it is no
+longer the default: `configs/char_transformer.yaml` and `configs/char_bigram.yaml`
+set `data.source: supabase` with `dataset_tag: all`, so a plain
+`python scripts/train.py --config configs/char_transformer.yaml --set run_name=ored_v207 --upload`
+trains on every enabled, verified row. Training on the generated corpus needs
+the explicit `--generated-corpus` flag (or `--set data.source=generated`); the
+run header then prints a warning, and the checkpoint records the corpus
+directory, the sha256 of its files and their line counts in `extra.dataset`
+(`source: generated`) so lineage is never empty.
 
 ## The simple workflow
 
@@ -57,15 +64,15 @@ default: `data.source: generated`.
    export ORED_SB_URL=https://<project>.supabase.co
    export ORED_SB_SERVICE_KEY=<the secret key, from the dashboard>
    cd ored/model
-   python scripts/train.py --config configs/char_transformer.yaml --supabase-dataset --upload
+   python scripts/train.py --config configs/char_transformer.yaml --set run_name=ored_v207 --upload
    ```
 
-   `--supabase-dataset` with no value trains on every enabled, verified row.
-   `--supabase-dataset physics_v1` trains on the rows whose `dataset_tag` is
-   `physics_v1`. The run is called `char_transformer-<tag>` (so
-   `char_transformer-all` here), which keeps its checkpoints apart from the
-   generated-corpus run `char_transformer`, whose vocabulary is different.
-   `--run-name` chooses another name.
+   With no dataset flag the config's own selection applies: every enabled,
+   verified row (`dataset_tag: all`), under the `run_name` you give.
+   `--supabase-dataset physics_v1` narrows the run to the rows whose
+   `dataset_tag` is `physics_v1`; a run started with that flag and no
+   `--run-name` is called `char_transformer-<tag>`, which keeps its checkpoints
+   apart from runs on other selections, whose vocabulary may differ.
 
 That is the whole loop. The log opens with the snapshot it is training on:
 

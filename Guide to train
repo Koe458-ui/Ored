@@ -240,11 +240,34 @@ PART 3 — TRAIN ON ONE PC
 
 10. Train
 
+Training reads your rows in Supabase (table "ored_training_data", PART 7).
+That is the default of configs\char_transformer.yaml: data.source: supabase,
+dataset_tag: all. Do step 35 first (the Supabase keys), then:
+
 RUN
 
-python scripts\generate_facts.py --repeats 20
+python scripts\train.py --config configs\char_transformer.yaml --set run_name=ored_v207 --upload --set training.epochs=40 --set training.device=cuda
 
-python scripts\train.py --config configs\char_transformer.yaml --set run_name=ored_v2 --set training.epochs=40 --set training.device=cuda
+Every run takes a fresh snapshot of the enabled + verified rows at that moment.
+Added rows since the last run = a new dataset version (all v2, v3, ...), so a new
+run_name per day (ored_v207, ored_v208, ...) is exactly right.
+
+OUTPUT (start) must show these lines, or the run is NOT on your data:
+
+TRAINING DATA SNAPSHOT
+dataset       : all v2 (ored_datasets ...)
+snapshot      : <64 letters>
+records       : 20,503  train ... / val ... / test ...
+session       : ... (ored_training_sessions, running)
+  corpus     : Supabase snapshot ... of 'all', 20,503 records (ored_training_data)
+
+If you see "corpus     : generated" the run is on the synthetic corpus. Stop it.
+
+The old synthetic corpus (grammar sentences + sums + facts.yaml) is now an
+explicit opt-out, never the default:
+
+python scripts\generate_facts.py --repeats 20
+python scripts\train.py --config configs\char_transformer.yaml --generated-corpus --set run_name=test_generated
 
 During training:
 
@@ -264,8 +287,10 @@ Old replaced checkpoints are kept in:
 
 history/
 
-This trains on the generated corpus (facts.yaml). To train on the questions
-you keep in Supabase instead, go to PART 7.
+Every checkpoint (base / live / best / history) records which data made it:
+dataset tag, snapshot hash, row count, split counts, selection rule, tokenizer
+hash, git commit and the ored_training_sessions id. See step 42.
+More ways to choose the rows (one tag, one subject, ...): PART 7.
 
 ---
 
@@ -505,11 +530,9 @@ OUTPUT
 
 Same on all PCs.
 
-Make the same training data on every PC (same command, same numbers):
-
-RUN
-
-python scripts\generate_facts.py --repeats 20
+Every PC must train on exactly the same Supabase snapshot: take ONE snapshot
+on PC 1 and pass its hash to every PC (step 43). Without the hash the launch
+stops and tells you to take a snapshot first.
 
 If one PC has different data or a different config, training stops and says which PC is different.
 
@@ -594,7 +617,9 @@ set NNODES=3
 set NPROC_PER_NODE=1
 set NODE_RANK=0
 
-python scripts\distributed.py launch train --config configs\char_transformer.yaml --session ored_v3-run1 --rendezvous static --set run_name=ored_v3 --set training.epochs=40 -- --upload --report
+python scripts\distributed.py launch train --config configs\char_transformer.yaml --session ored_v3-run1 --rendezvous static --set run_name=ored_v3 --set training.epochs=40 --set data.supabase.snapshot=PASTE_THE_64_LETTER_HASH -- --upload --report
+
+(The hash comes from "python scripts\training_data.py snapshot --dataset-tag all --upload", step 43.)
 
 5 PCs
 
@@ -800,6 +825,10 @@ Supabase records which data made which checkpoint
 
 Only rows with enabled = true AND verified = true are used.
 Rows added while training runs are not used by that run.
+
+This is the DEFAULT since ored_v207: configs\char_transformer.yaml has
+data.source: supabase and dataset_tag: all, so step 10 already trains on every
+enabled + verified row. The commands below only narrow the selection.
 
 Full details: ored\model\docs\training-data.md
 
@@ -1059,9 +1088,10 @@ OUTPUT (end)
 Train on exactly this snapshot:
   python scripts\train.py ... --snapshot 8466d709a23e1131...(64 letters)
 
-Copy the 64-letter hash. Then do step 26 on EVERY PC, adding these three --set:
+Copy the 64-letter hash. Then do step 26 on EVERY PC, adding this --set (data.source is already supabase;
+add --set data.supabase.dataset_tag=facts too if you snapshotted one tag):
 
---set data.source=supabase --set data.supabase.dataset_tag=facts --set data.supabase.snapshot=PASTE_THE_64_LETTER_HASH
+--set data.supabase.snapshot=PASTE_THE_64_LETTER_HASH
 
 Example:
 

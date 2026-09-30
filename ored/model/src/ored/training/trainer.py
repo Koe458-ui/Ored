@@ -538,6 +538,9 @@ def train(cfg: Config, ensure_dataset: bool = True) -> Dict[str, Any]:
     if cfg.data.source == "supabase":
         from ored.training.dataset_run import run_supabase_training
         return run_supabase_training(cfg)
+    if cfg.task == "language_model":
+        logger.info("data.source is generated: this run does NOT read ored_training_data "
+                    "(remove --generated-corpus / data.source=generated to train on Supabase data)")
     if ensure_dataset:
         if cfg.task == "bit_addition" and not Path(cfg.data.raw_path).exists():
             from ored.data.generate import generate_dataset
@@ -589,11 +592,19 @@ def add_dataset_arguments(parser: argparse.ArgumentParser) -> None:
     group.add_argument("--snapshot", metavar="HASH", help="reuse this snapshot instead of taking a new one")
     group.add_argument("--split-seed", type=int, metavar="N", help="seed of the train/val/test split")
     group.add_argument("--notes", default=None, help="a note stored with the snapshot")
+    group.add_argument("--generated-corpus", action="store_true",
+                       help="train on the generated corpus in data.corpus.dir instead of Supabase data "
+                            "(the explicit opt-out; the configs default to data.source: supabase)")
 
 
 def apply_dataset_arguments(cfg: Config, args: argparse.Namespace, overrides: List[str]) -> None:
     has_filters = any((args.types, args.categories, args.subjects, args.languages,
                        args.include_unverified, args.skip_invalid, args.snapshot))
+    if getattr(args, "generated_corpus", False):
+        if args.supabase_dataset is not None or has_filters:
+            raise ValueError("--generated-corpus cannot be combined with --supabase-dataset or its filters")
+        cfg.data.source = "generated"
+        return
     if args.supabase_dataset is None and not has_filters:
         return
     settings = cfg.data.supabase
@@ -616,7 +627,8 @@ def apply_dataset_arguments(cfg: Config, args: argparse.Namespace, overrides: Li
         settings.split_seed = args.split_seed
     if args.notes is not None:
         settings.notes = args.notes
-    if not args.run_name and not any(o.strip().startswith("run_name=") for o in overrides):
+    if (args.supabase_dataset is not None and not args.run_name
+            and not any(o.strip().startswith("run_name=") for o in overrides)):
         from ored.data.snapshot import safe_tag
         cfg.run_name = f"{cfg.run_name}-{safe_tag(settings.dataset_tag)}"
 

@@ -121,6 +121,9 @@ class LanguageModelTask(Task):
         self.tokenizer = tokenizer
         if self.cfg.data.source == "supabase":
             self.dataset = self._snapshot_summary(tokenizer)
+        else:
+            from ored.data.snapshot import generated_corpus_summary
+            self.dataset = generated_corpus_summary(self.cfg, tokenizer.to_dict())
         return loaders, datasets
 
     def _snapshot_summary(self, tokenizer) -> Dict[str, Any]:
@@ -166,11 +169,23 @@ class LanguageModelTask(Task):
                  for name in ("train", "val", "test")]
         if self.tokenizer is not None:
             lines.append(f"tokenizer  : {self.tokenizer.describe()}")
-        if self.dataset:
+        if self.dataset.get("source") == "supabase":
             lines.append(f"corpus     : Supabase snapshot {self.dataset['snapshot_sha256'][:16]} of "
-                         f"{self.dataset['dataset_tag']!r}, {self.dataset['records']:,} records")
+                         f"{self.dataset['dataset_tag']!r}, {self.dataset['records']:,} records "
+                         f"(ored_training_data)")
+            fetched = self.dataset.get("rows_fetched")
+            if fetched is not None:
+                counts = self.dataset.get("split_counts") or {}
+                lines.append(f"rows       : {fetched:,} fetched from ored_training_data -> "
+                             f"{self.dataset['records']:,} trained on "
+                             f"(train {counts.get('train', 0):,} / val {counts.get('val', 0):,} / "
+                             f"test {counts.get('test', 0):,})")
         else:
-            lines.append(f"corpus     : generated, {self.cfg.data.corpus.dir}")
+            sha = str(self.dataset.get("corpus_sha256") or "")[:16]
+            lines.append(f"corpus     : generated, {self.cfg.data.corpus.dir} (sha256 {sha})")
+            lines.append("WARNING    : this run trains on the GENERATED corpus, not on the rows in "
+                         "ored_training_data. Drop --generated-corpus / data.source=generated to "
+                         "train on Supabase data.")
         return lines
 
     def checkpoint_extra(self) -> Dict[str, Any]:

@@ -125,6 +125,8 @@ class Snapshot:
             "dataset_tag": m["dataset_tag"],
             "snapshot_sha256": m["sha256"],
             "records": m["counts"]["records"],
+            "rows_fetched": m["counts"].get("fetched", m["counts"]["records"]),
+            "rows_matching_in_supabase": m["counts"].get("matching_in_supabase"),
             "split_counts": self.split_counts,
             "selection": m["selection"],
             "split_seed": m["split"]["seed"],
@@ -251,8 +253,13 @@ def build_snapshot(store: Any, cfg: Config, page_size: int = 1000) -> Snapshot:
     writer = _Writer(building, settings.split_seed, fractions, cfg.data.block_size)
     problems: List[RecordCheck] = []
     warnings = 0
+    fetched = 0
+    logger.info(f"fetching rows from ored_training_data: {selection.describe()}")
     try:
         for record in store.iter_training_data(selection, page_size):
+            fetched += 1
+            if fetched % page_size == 0:
+                logger.info(f"  fetched {fetched:,} rows so far ...")
             check = check_record(record)
             warnings += int(bool(check.warnings))
             if not check.ok:
@@ -262,6 +269,8 @@ def build_snapshot(store: Any, cfg: Config, page_size: int = 1000) -> Snapshot:
         writer.close()
 
         expected = store.count_training_data(selection)
+        logger.info(f"fetched {fetched:,} rows from ored_training_data (Supabase counts {expected:,} for this "
+                    f"selection); {writer.counts['records']:,} valid, {len(problems)} invalid")
         if expected != writer.counts["records"] + len(problems):
             raise SnapshotError(
                 f"read {writer.counts['records'] + len(problems)} rows but Supabase counts {expected} for "
@@ -300,6 +309,8 @@ def build_snapshot(store: Any, cfg: Config, page_size: int = 1000) -> Snapshot:
             },
             "counts": {
                 "records": writer.counts["records"],
+                "fetched": fetched,
+                "matching_in_supabase": expected,
                 **{s: writer.counts[s] for s in SPLITS},
                 "by_type": dict(sorted(writer.by_type.items())),
                 "by_category": dict(sorted(writer.by_category.items())),
@@ -379,6 +390,59 @@ def corpus_directory(cfg: Config) -> Path:
     if cfg.data.source == "supabase":
         return load_snapshot(cfg).directory
     return Path(cfg.data.corpus.dir)
+
+
+GENERATED_META = ("corpus_meta.json", "facts.json")
+
+
+def generated_corpus_summary(cfg: Config, tokenizer: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    directory = Path(cfg.data.corpus.dir)
+    files: Dict[str, Dict[str, Any]] = {}
+    content = hashlib.sha256()
+    lines = 0
+    characters = 0
+    for split in SPLITS:
+        path = directory / f"{split}.txt"
+        sha = digest_file(path)
+        text = path.read_text(encoding="utf-8")
+        files[f"{split}.txt"] = {"sha256": sha, "bytes": path.stat().st_size,
+                                 "characters": len(text), "lines": text.count("\n")}
+        lines += files[f"{split}.txt"]["lines"]
+        characters += len(text)
+        content.update(f"{split}\t{sha}\n".encode("utf-8"))
+    meta: Dict[str, Any] = {}
+    for name in GENERATED_META:
+        path = directory / name
+        if path.is_file():
+            try:
+                meta[name] = json.loads(path.read_text(encoding="utf-8"))
+            except ValueError:
+                meta[name] = None
+    facts = meta.get("facts.json") or {}
+    summary: Dict[str, Any] = {
+        "source": "generated",
+        "dataset_tag": None,
+        "snapshot_sha256": None,
+        "corpus_dir": str(directory),
+        "corpus_sha256": content.hexdigest(),
+        "files": files,
+        "records": lines,
+        "characters": characters,
+        "corpus_meta": meta.get("corpus_meta.json") or {
+            "sentence_lines": cfg.data.corpus.sentence_lines,
+            "max_operand": cfg.data.corpus.max_operand,
+            "arithmetic_repeats": cfg.data.corpus.arithmetic_repeats,
+            "reverse_answer": cfg.data.corpus.reverse_answer,
+        },
+        "facts": ({"count": len(facts.get("facts") or []), "repeats": facts.get("repeats")}
+                  if facts else None),
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    if tokenizer is not None:
+        summary["tokenizer"] = {"name": cfg.data.tokenizer, "vocab_size": len(tokenizer.get("itos", [])),
+                                "sha256": tokenizer_digest(tokenizer)}
+    summary.update(code_version())
+    return summary
 
 
 def dataset_files_from_env() -> Any:
@@ -515,7 +579,11 @@ def describe_snapshot(prepared: PreparedDataset) -> List[str]:
         f"folder        : {snapshot.directory}"
         + (" (new)" if prepared.built else " (reused, files verified)"),
         f"selection     : {m['selection']['rule']}",
-        f"records       : {counts['records']:,}  train {counts['train']:,} / val {counts['val']:,} / "
+        f"rows fetched  : {counts.get('fetched', counts['records']):,} from ored_training_data"
+        + (f" (of {counts['matching_in_supabase']:,} matching)" if counts.get("matching_in_supabase") is not None else "")
+        + (f", {len(m['skipped'])} invalid left out" if m["skipped"] else "")
+        + ("" if prepared.built else f"  [snapshot reused, taken {m['created_at']}]"),
+        f"rows trained  : {counts['records']:,}  train {counts['train']:,} / val {counts['val']:,} / "
         f"test {counts['test']:,}  (seed {m['split']['seed']})",
         f"groups        : train {m['split']['groups']['train']:,} / val {m['split']['groups']['val']:,} / "
         f"test {m['split']['groups']['test']:,}  (a group never crosses splits)",

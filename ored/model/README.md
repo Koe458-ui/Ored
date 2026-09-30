@@ -907,9 +907,14 @@ is stated as "no benefit" rather than "harmful" for exactly this reason.
 
 ## Running Step 2
 
+`configs/char_transformer.yaml` trains on the rows in Supabase
+(`data.source: supabase`, `dataset_tag: all`; see [Training data kept in
+Supabase](#training-data-kept-in-supabase)). The generated corpus is an explicit
+opt-out, `--generated-corpus`:
+
 ```bash
 python scripts/generate_corpus.py
-python scripts/train.py --config configs/char_transformer.yaml
+python scripts/train.py --config configs/char_transformer.yaml --generated-corpus
 python scripts/evaluate.py --checkpoint checkpoints/char_transformer/best.pt
 
 python scripts/generate.py --prompt "the "
@@ -921,7 +926,7 @@ python scripts/generate.py --temperature 1.2 --top-k 10 --tokens 600
 The baseline, for comparison:
 
 ```bash
-python scripts/train.py --config configs/char_bigram.yaml
+python scripts/train.py --config configs/char_bigram.yaml --generated-corpus
 ```
 
 ## Teaching Ored to answer a question
@@ -975,7 +980,7 @@ The same questions are also in Supabase now, as the `facts` dataset of
 ```bash
 python scripts/generate_facts.py
 python scripts/generate_facts.py --repeats 80
-python scripts/train.py --config configs/char_transformer.yaml
+python scripts/train.py --config configs/char_transformer.yaml --generated-corpus
 python scripts/infer.py --checkpoint checkpoints/char_transformer/best.pt --text "what is a human ? "
 ```
 
@@ -1219,15 +1224,21 @@ immutable snapshot of the enabled, verified rows, not on the live table:
 
 ```bash
 python scripts/training_data.py stats
-python scripts/train.py --config configs/char_transformer.yaml --supabase-dataset --upload
-python scripts/training_data.py lineage checkpoints/char_transformer-all/best.pt
+python scripts/train.py --config configs/char_transformer.yaml --set run_name=ored_v207 --upload
+python scripts/training_data.py lineage checkpoints/ored_v207/best.pt
 ```
 
-The snapshot is split by question before tokenising, hashed, versioned in
-`ored_datasets`, linked to its `ored_training_sessions` row and written into
-every checkpoint it produces. The generated corpus stays the default
-(`data.source: generated`). Everything else — the table, the text forms,
-selection, the split, versions and lineage — is in
+This is the default: `configs/char_transformer.yaml` sets `data.source:
+supabase` and `dataset_tag: all`, so a plain `train.py` run snapshots every
+enabled, verified row at that moment (new rows since the last run give the next
+dataset version). The snapshot is split by question before tokenising, hashed,
+versioned in `ored_datasets`, linked to its `ored_training_sessions` row and
+written into every checkpoint it produces (`extra.dataset`: tag, snapshot
+sha256, row and split counts, selection, tokenizer hash, git commit, session).
+The generated corpus is an explicit opt-out (`--generated-corpus`, or
+`--set data.source=generated`); such a run logs a warning and records the
+corpus directory, its sha256 and line counts instead. Everything else — the
+table, the text forms, selection, the split, versions and lineage — is in
 [`docs/training-data.md`](docs/training-data.md).
 
 ### Training on several PCs
