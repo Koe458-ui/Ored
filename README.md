@@ -20,6 +20,7 @@
 
 <h1 align="center">Features</h1>
 <p align="center">
+ 
   - Dynamic gallery and profile view.
   - Artist follow, like , messages ,etc
   
@@ -39,10 +40,10 @@ See the ""LICENSE"" (LICENSE) file for the complete license terms.
 
 <h1 align="center">Team</h1>
 <p align="center">The oredlab Team — oredlab.com
-
- Albaze 
- Deepak
- Koe
+  
+  - Albaze (Harsh)
+  - Koe (Anish)
+  
 </p>
 
 
