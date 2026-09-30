@@ -1,3 +1,6 @@
+       ##oredlab
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 ## 🎨 Ored - the art community
 > oredlab is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves.
 
