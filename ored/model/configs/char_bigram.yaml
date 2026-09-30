@@ -4,6 +4,7 @@ seed: 1337
 deterministic: true
 
 data:
+  source: supabase
   tokenizer: char
   block_size: 128
   stride: 64
@@ -19,6 +20,8 @@ data:
       val: 0.15
       test: 0.15
     val_test_fraction: 0.15
+  supabase:
+    dataset_tag: all
 
 model:
   name: bigram

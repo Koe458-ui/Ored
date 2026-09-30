@@ -48,6 +48,7 @@ def tiny_lm_cfg(tmp_path):
     cfg = load_config(
         LM_CONFIG_PATH,
         overrides=[
+            "data.source=generated",
             "training.epochs=2",
             "training.log_every=100",
             "training.early_stopping_patience=0",

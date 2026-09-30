@@ -299,11 +299,14 @@ def remote(store, monkeypatch):
     return store, checkpoints, datasets
 
 
-def test_training_end_to_end_records_the_dataset(remote, cfg):
+def test_training_end_to_end_records_the_dataset(remote, cfg, caplog):
     store, checkpoints, datasets = remote
     cfg.checkpoint.upload = True
+    caplog.set_level("INFO")
     result = train(cfg)
 
+    assert f"rows fetched  : {len(synthetic_rows()):,} from ored_training_data (of {len(synthetic_rows()):,} matching)" in caplog.text
+    assert f"rows       : {len(synthetic_rows()):,} fetched from ored_training_data -> " in caplog.text
     [session] = store.sessions()
     assert session.status is SessionStatus.EVALUATED and session.id == result["session_id"]
     [dataset] = store.datasets("all")
@@ -324,6 +327,7 @@ def test_training_end_to_end_records_the_dataset(remote, cfg):
         link = payload["extra"]["dataset"]
         assert link["snapshot_sha256"] == dataset.sha256 and link["dataset_id"] == dataset.id
         assert link["session_id"] == session.id and link["records"] == dataset.record_count
+        assert link["rows_fetched"] == link["rows_matching_in_supabase"] == len(synthetic_rows())
         assert link["selection"]["verified_only"] is True
         assert payload["config"]["data"]["source"] == "supabase"
 
@@ -377,10 +381,25 @@ def test_train_command_line_selects_supabase(remote, cfg, monkeypatch, tmp_path)
     assert c.run_name == "char_transformer-physics_v1"
     seen.clear()
     train_main(["--config", str(CONFIG)])
-    assert seen["cfg"].data.source == "generated" and seen["cfg"].run_name == "char_transformer"
+    assert seen["cfg"].data.source == "supabase" and seen["cfg"].data.supabase.dataset_tag == "all"
+    assert seen["cfg"].run_name == "char_transformer"
+    seen.clear()
+    train_main(["--config", str(CONFIG), "--set", "run_name=ored_v207"])
+    assert seen["cfg"].data.source == "supabase" and seen["cfg"].run_name == "ored_v207"
     seen.clear()
     train_main(["--config", str(CONFIG), "--supabase-dataset"])
-    assert seen["cfg"].data.supabase.dataset_tag == "all"
+    assert seen["cfg"].data.supabase.dataset_tag == "all" and seen["cfg"].run_name == "char_transformer-all"
+    seen.clear()
+    train_main(["--config", str(CONFIG), "--generated-corpus"])
+    assert seen["cfg"].data.source == "generated" and seen["cfg"].run_name == "char_transformer"
+    with pytest.raises(ValueError, match="generated-corpus"):
+        train_main(["--config", str(CONFIG), "--generated-corpus", "--supabase-dataset", "facts"])
+
+
+def test_the_shipped_configs_train_on_supabase_by_default():
+    for name in ("char_transformer.yaml", "char_bigram.yaml"):
+        cfg = load_config(CONFIG.parent / name)
+        assert cfg.data.source == "supabase" and cfg.data.supabase.dataset_tag == "all"
 
 
 def test_training_data_commands(remote, cfg, tmp_path, caplog):
@@ -407,6 +426,7 @@ def test_training_data_commands(remote, cfg, tmp_path, caplog):
     assert data_cli(["snapshot", "--dataset-tag", "all", "--config", str(CONFIG),
                      "--set", f"data.supabase.snapshot_dir={cfg.data.supabase.snapshot_dir}"], store=store) == 0
     assert "leakage       : none" in caplog.text
+    assert "rows fetched  : " in caplog.text and " rows from ored_training_data (Supabase counts " in caplog.text
 
 
 def test_lineage_answers_which_data_produced_a_checkpoint(remote, cfg, caplog):
@@ -420,14 +440,38 @@ def test_lineage_answers_which_data_produced_a_checkpoint(remote, cfg, caplog):
     assert dataset.sha256 in caplog.text and "v1" in caplog.text and "verified = true" in caplog.text
 
 
-def test_generated_corpus_is_unchanged(tiny_corpus, caplog):
+def test_generated_corpus_is_unchanged_and_recorded(tiny_corpus, caplog):
     assert tiny_corpus.data.source == "generated"
     caplog.set_level("INFO")
     result = train(tiny_corpus)
     payload = load_checkpoint(Path(tiny_corpus.checkpoint_dir) / "best.pt")
-    assert "dataset" not in (payload.get("extra") or {})
+    dataset = payload["extra"]["dataset"]
+    assert dataset["source"] == "generated" and dataset["snapshot_sha256"] is None
+    assert dataset["corpus_dir"] == tiny_corpus.data.corpus.dir
+    assert re.fullmatch(r"[0-9a-f]{64}", dataset["corpus_sha256"])
+    assert set(dataset["files"]) == {"train.txt", "val.txt", "test.txt"}
+    assert dataset["records"] == sum(f["lines"] for f in dataset["files"].values()) > 0
+    assert dataset["tokenizer"]["vocab_size"] == payload["architecture"]["vocab_size"]
     assert result["history"] and "corpus     : generated" in caplog.text
+    assert "WARNING    : this run trains on the GENERATED corpus" in caplog.text
     assert dataset_run.lineage_of_payload(payload)["source"] == "generated"
+    caplog.clear()
+    assert data_cli(["lineage", str(Path(tiny_corpus.checkpoint_dir) / "best.pt")], store=InMemoryStore()) == 0
+    assert "NOT Supabase data" in caplog.text and dataset["corpus_sha256"] in caplog.text
+
+
+def test_checkpoint_evaluation_uses_the_data_the_checkpoint_records(remote, cfg):
+    from ored.training.checkpoints import evaluate_file
+
+    train(cfg)
+    best = Path(cfg.checkpoint_dir) / "best.pt"
+    fresh = load_config(CONFIG, overrides=[
+        "training.device=cpu", "data.block_size=32", "data.stride=16", "data.batch_size=8",
+        "model.d_model=32", "model.n_layer=2", "model.n_head=2", "model.d_ff=64", "model.dropout=0.0"])
+    fresh.data.supabase.snapshot_dir = cfg.data.supabase.snapshot_dir
+    assert fresh.data.source == "supabase" and not fresh.data.supabase.snapshot
+    metrics = evaluate_file(best, fresh, "cpu")
+    assert metrics["val_loss"] == pytest.approx(load_checkpoint(best)["metrics"]["val_loss"], rel=1e-4)
 
 
 def test_distributed_needs_a_pinned_snapshot(cfg):
@@ -447,7 +491,7 @@ def test_distributed_needs_a_pinned_snapshot(cfg):
 
 def test_supabase_source_needs_a_tag_and_the_language_model():
     with pytest.raises(ValueError, match="dataset_tag"):
-        load_config(CONFIG, overrides=["data.source=supabase"])
+        load_config(CONFIG, overrides=["data.source=supabase", "data.supabase.dataset_tag="])
     with pytest.raises(ValueError, match="language_model"):
         load_config(CONFIG.parent / "bit_adder_mlp.yaml",
                     overrides=["data.source=supabase", "data.supabase.dataset_tag=all"])

@@ -269,6 +269,24 @@ def free_path(path: Path) -> Path:
     return candidate
 
 
+def pin_data_from_payload(cfg: Config, payload: Dict[str, Any]) -> None:
+    settings = cfg.data.supabase
+    if cfg.data.source != "supabase" or settings.snapshot:
+        return
+    recorded = (payload.get("config") or {}).get("data") or {}
+    supabase = recorded.get("supabase") or {}
+    if recorded.get("source") == "supabase" and supabase.get("snapshot"):
+        settings.dataset_tag = supabase.get("dataset_tag") or settings.dataset_tag
+        settings.snapshot = str(supabase["snapshot"])
+        if supabase.get("snapshot_dir"):
+            settings.snapshot_dir = str(supabase["snapshot_dir"])
+    elif recorded.get("source", "generated") == "generated":
+        cfg.data.source = "generated"
+        corpus_dir = (recorded.get("corpus") or {}).get("dir")
+        if corpus_dir:
+            cfg.data.corpus.dir = str(corpus_dir)
+
+
 def evaluate_file(path: str | Path, cfg: Config, device: str = "auto") -> Dict[str, float]:
     from ored.training.trainer import Trainer
 
@@ -276,6 +294,7 @@ def evaluate_file(path: str | Path, cfg: Config, device: str = "auto") -> Dict[s
     cfg.training.resume = ""
     cfg.training.device = device
     cfg.checkpoint.upload = False
+    pin_data_from_payload(cfg, load_checkpoint(path))
     trainer = Trainer(cfg)
     payload = load_checkpoint(path, map_location=trainer.device)
     check_compatible(payload, trainer.model, path=path, tokenizer=trainer._tokenizer())
