@@ -432,7 +432,7 @@
          options:YES_NO_PLAIN, def:'no'},
         {k:'is_mature', t:'sel', slot:4, label:'Mature content', req:true,
          options:YES_NO_PLAIN, def:'no',
-         hint:'Say so if it is. The review also marks work it judges mature.'},
+         hint:'Say so if it is.'},
         {k:'credits', t:'list', slot:4, cap:20, imin:2, imax:300,
          label:'Credits / collaborators', ph:'Name and role, then press Enter',
          hint:'Models, assistants, client, team.'},
@@ -2617,59 +2617,6 @@
     dzCountPaint(el);
   }
 
-  var dzV = {
-    title:'', transfer:'', publish:'', failReason:null,
-    recvLabel:'File & preview received',
-    reset:function(t){
-      this.title=t||'Upload';
-      this.transfer=''; this.publish=''; this.publishSub=''; this.failReason=null;
-    },
-    open:function(t, recv){
-      this.reset(t);
-      this.recvLabel = recv || 'File & preview received';
-      var bd=document.getElementById('upqBackdrop'); if(bd) bd.classList.add('open');
-      this.render();
-    },
-    close:function(){
-      if(typeof upqCloseModal==='function'){ upqCloseModal(); return; }
-      var bd=document.getElementById('upqBackdrop'); if(bd) bd.classList.remove('open');
-    },
-    step:function(k,state,sub){ this[k]=state; if(sub!=null) this[k+'Sub']=sub; this.render(); },
-    fail:function(reason){
-      this.failReason=reason;
-      var bd=document.getElementById('upqBackdrop'); if(bd) bd.classList.add('open');
-      this.render();
-    },
-    render:function(){
-      var t=document.getElementById('upqMTitle'), b=document.getElementById('upqMBody');
-      if(!t||!b) return;
-      var trk=(typeof upqTrackRow==='function') ? upqTrackRow
-              : function(st,n,sub){ return '<div>'+esc(n)+'</div>'; };
-      var failed=!!this.failReason, html='';
-      t.textContent = failed ? 'UPLOAD FAILED' : 'UPLOAD STATUS';
-      if(failed){
-        html+='<div class="upqFailBox"><div class="upqFailIco">!</div>'+
-          '<div><div class="upqFailTitle">\u201C'+esc(this.title||'Untitled')+'\u201D was not published</div>'+
-          '<div class="upqFailReason">'+esc(this.failReason)+'</div></div></div>';
-      }
-      html+=trk('pass','Upload received','',false);
-      html+=trk('pass', this.recvLabel || 'File & preview received', '', false);
-      html+=trk(this.transfer,'Secure transfer','',false);
-      var pubSub = (this.publish==='pass') ? (this.publishSub || 'It\u2019s live') : '';
-      var sched  = /^Scheduled/.test(this.publishSub || '');
-      html+=trk(this.publish,'Publish', pubSub, true);
-      if(failed){
-        html+='<div class="upqFin fail">Upload stopped \u2014 nothing was published</div>';
-        html+='<div class="upqFailNote">Any transferred file has been removed. Fix the issue above and publish again whenever you\u2019re ready.</div>';
-      } else if(this.publish==='pass'){
-        html+='<div class="upqFin ok">'+(sched ? 'Done \u2014 '+esc(this.publishSub) : 'Done \u2014 it\u2019s live')+'</div>';
-      } else {
-        html+='<div class="upqFin busy">Publishing your upload now\u2026</div>';
-      }
-      b.innerHTML=html;
-    }
-  };
-
   async function dzSubmit(sec){
     if(!sb){ showToast('Backend not configured'); return; }
     if(!window.currentUser){
@@ -2694,19 +2641,11 @@
     if(bad){ dzFieldFail(sec, bad.k, bad.msg); return; }
 
     if(btn){ btn.disabled = true; btn.textContent = 'Publishing…'; }
-    var trackImg = null, trackRecv = 'File & preview received';
-    if(sec === 'resources' || sec === 'marketplace'){ trackImg = st(sec).files.preview; }
-    else if(sec === 'blog'){ trackImg = st(sec).files.cover; trackRecv = 'Cover image received'; }
-    var tracked = !!trackImg;
-      // Every object this submit puts in storage, so a submit that fails on the way to the database takes them back out —
-      // the failure panel says so. Declared out here because the catch reads it however early the throw came.
+      // Every object this submit puts in storage, so a submit that fails on the way to the database takes them back out.
+      // Declared out here because the catch reads it however early the throw came.
     var landedFiles = [];
+    dzUploadHold(true);
     try{
-      if(tracked){
-        dzV.open(val(sec,'title') || SEC[sec].noun, trackRecv);
-        dzV.step('transfer','run');
-      }
-
       var stamp = Date.now();
       var base  = safeSlug(val(sec,'title') || sec, 60) || sec;
 
@@ -2871,7 +2810,6 @@
       }
       var when = dzSchPicked();
       if(when){
-        if(tracked){ dzV.step('transfer','pass'); dzV.step('publish','run'); }
         var payload = {}; for(var pk in row){ if(pk!=='status') payload[pk]=row[pk]; }
         var paths = [];
         ['file_storage_path','preview_storage_path','cover_storage_path'].forEach(function(k){ if(row[k]) paths.push(row[k]); });
@@ -2885,13 +2823,11 @@
           }) : null
         }).select('id').single();
         if(sres.error) throw sres.error;
-        if(tracked){ dzV.step('publish','pass','Scheduled for '+dzFmtWhen(when)); setTimeout(function(){ dzV.close(); }, 1400); }
         showToast('Scheduled for '+dzFmtWhen(when));
         dzResetForm(sec);
         return;
       }
 
-      if(tracked){ dzV.step('transfer','pass'); dzV.step('publish','run'); }
       var res = await sb.from(SEC[sec].table).insert(row).select('id').single();
       if(res.error) throw res.error;
 
@@ -2922,7 +2858,6 @@
         }
       }
 
-      if(tracked){ dzV.step('publish','pass'); setTimeout(function(){ dzV.close(); }, 1400); }
       showToast('Published');
       dzResetForm(sec);
       dzLoaded[sec] = false;
@@ -2933,9 +2868,9 @@
         try{ await s3Delete(landedFiles[ci].bucket, landedFiles[ci].path); }
         catch(sweep){ console.error('publish cleanup:', (sweep && sweep.message) || sweep); }
       }
-      if(tracked){ dzV.fail((err && err.message) ? err.message : 'Could not publish'); }
-      else { showToast((err && err.message) ? err.message : 'Could not publish'); }
+      showToast((err && err.message) ? err.message : 'Could not publish');
     }finally{
+      dzUploadHold(false);
       if(btn){ btn.disabled = false; btn.textContent = '📤 Publish'; }
     }
   }

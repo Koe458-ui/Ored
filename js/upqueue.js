@@ -1,6 +1,6 @@
-  var upq = { jobs: [], seq: 0, modalJob: null, modalSnap: null };
+  var upq = { jobs: [], seq: 0 };
 
-  var UPQ_STAGE_LABEL = { uploading:'UPLOADING', finalizing:'ALMOST DONE', live:'LIVE', failed:'FAILED' };
+  var UPQ_STAGE_LABEL = { uploading:'UPLOADING', finalizing:'ALMOST DONE', live:'LIVE' };
 
   function upqStart(snap){
     var job = {
@@ -14,20 +14,16 @@
       publishAt: snap.publishAt || '',
       upDone: 0, upTotal: 1 + snap.pageFiles.length,
       uploadedPaths: [],
-      landed: false,
-      failReason: null
+      landed: false
     };
     upq.jobs.unshift(job);
     upqSync();
     upqRun(job);
   }
 
-  function upqFind(id){ return upq.jobs.find(function(j){ return j.id===id; }); }
-
   function upqRemove(id){
     var i = upq.jobs.findIndex(function(j){ return j.id===id; });
     if(i!==-1) upq.jobs.splice(i,1);
-    if(upq.modalJob===id) upqCloseModal();
     upqSync();
   }
 
@@ -38,7 +34,6 @@
     if(typeof mwRenderArt==='function' && typeof mw==='object' && mw && Array.isArray(mw.art)){
       mwRenderArt();
     }
-    upqRenderModal();
   }
 
   function upqOwnQueueHTML(){
@@ -47,7 +42,7 @@
       var hint = '';
       if(j.stage==='uploading')       hint = j.upTotal>1 ? ('Transferring '+Math.min(j.upDone+1,j.upTotal)+' of '+j.upTotal+' images') : 'Transferring image';
       else if(j.stage==='finalizing') hint = 'Publishing';
-      return '<div class="upqCard'+(j.stage==='live'?' upqLive':'')+'" onclick="upqOpenModal(\''+j.id+'\')" role="status" title="Tap for status">'+
+      return '<div class="upqCard'+(j.stage==='live'?' upqLive':'')+'" role="status">'+
         '<div class="upqImgWrap">'+
           (j.preview ? '<img class="upqImg" src="'+j.preview+'" alt="" style="'+thumbStyle(j.thumbFocus.x, j.thumbFocus.y, j.thumbFocus.z)+'">' : '')+
           '<div class="upqOvl">'+
@@ -62,6 +57,7 @@
   }
 
   async function upqRun(job){
+    dzUploadHold(true);
     try{
       job.stage='uploading'; job.upDone=0; upqSync();
       var phash = (window.ImageHash && typeof ImageHash.phashOf==='function')
@@ -190,103 +186,16 @@
           catch(e){ console.error('upq cleanup:', e.message); }
         }
       }
-      job.stage='failed';
+      var why;
       if(err && /row-level security|violates row-level|42501/i.test((err.message||'')+' '+(err.code||''))){
-        job.failReason = 'Your merit is below 80 \u2014 uploads are paused until it recovers (+2/day).';
+        why = 'Your merit is below 80 \u2014 uploads are paused until it recovers (+2/day).';
       } else {
-        job.failReason = safeErr(err, 'Upload failed \u2014 please try again');
+        why = safeErr(err, 'Upload failed \u2014 please try again');
       }
       console.error('upq failed:', err && err.message);
-      upqOpenModal(job.id);
+      upqRemove(job.id);
+      showToast('\u201C'+(job.name||'Artwork')+'\u201D was not published \u2014 '+why);
+    }finally{
+      dzUploadHold(false);
     }
   }
-
-  function upqOpenModal(id){
-    var j = upqFind(id);
-    if(!j) return;
-    if(j.stage==='failed'){
-      upq.modalSnap = j; upq.modalJob = null;
-      var i = upq.jobs.indexOf(j); if(i!==-1) upq.jobs.splice(i,1);
-      upqSync();
-    } else {
-      upq.modalJob = id; upq.modalSnap = null;
-    }
-    upqRenderModal();
-    document.getElementById('upqBackdrop').classList.add('open');
-  }
-  function upqCloseModal(){
-    upq.modalJob = null; upq.modalSnap = null;
-    var bd = document.getElementById('upqBackdrop');
-    if(bd) bd.classList.remove('open');
-  }
-
-  function upqTrackRow(state, name, sub, last){
-    var cls = state==='run' ? 'run' : (state==='pass' ? 'pass' : (state==='flag'||state==='block'||state==='fail') ? 'fail' : 'pend');
-    var ico = cls==='pass' ? '\u2713' : cls==='fail' ? '\u2715' : '';
-    var lbl = cls==='pass' ? 'Done' : cls==='fail' ? 'Failed' : cls==='run' ? 'Working\u2026' : 'Pending';
-    return '<div class="upqTrk '+cls+'">'+
-      '<div class="upqTrkRail"><div class="upqTrkIco">'+ico+'</div>'+(last?'':'<div class="upqTrkLine"></div>')+'</div>'+
-      '<div class="upqTrkTx"><div class="upqTrkName">'+name+'</div>'+
-      (sub ? '<div class="upqTrkSub">'+esc(sub)+'</div>' : '')+'</div>'+
-      '<div class="upqTrkState">'+lbl+'</div>'+
-    '</div>';
-  }
-
-  function upqRenderModal(){
-    var j = upq.modalSnap || (upq.modalJob && upqFind(upq.modalJob));
-    if(!j) return;
-    var title = document.getElementById('upqMTitle');
-    var body  = document.getElementById('upqMBody');
-    if(!title || !body) return;
-    var failed = j.stage==='failed';
-    title.textContent = failed ? 'UPLOAD FAILED' : 'UPLOAD STATUS';
-    var order = ['uploading','finalizing','live'];
-    var si = order.indexOf(j.stage);
-    var transferState = j.stage==='uploading' ? 'run' : (si>0 ? 'pass' : '');
-    var publishState  = j.stage==='finalizing' ? 'run' : (j.stage==='live' ? 'pass' : '');
-    var transferSub = j.stage==='uploading'
-      ? (j.upTotal>1 ? (Math.min(j.upDone+1,j.upTotal)+' of '+j.upTotal+' images') : 'Sending your image')
-      : (si>0 ? 'Done' : '');
-    var html = '';
-    if(failed){
-      html += '<div class="upqFailBox">'+
-        '<div class="upqFailIco">!</div>'+
-        '<div><div class="upqFailTitle">\u201C'+esc(j.name||'Untitled')+'\u201D was not published</div>'+
-        '<div class="upqFailReason">'+esc(j.failReason||'The artwork could not be published.')+'</div></div>'+
-      '</div>';
-    }
-    var rows = [
-      ['pass', 'Upload received', ''],
-      ['pass', 'File integrity & format', ''],
-      [transferState, 'Secure transfer', transferSub],
-      [publishState, 'Publish', j.stage==='live' ? 'Your artwork is live' : '']
-    ];
-    for(var ri=0; ri<rows.length; ri++){
-      html += upqTrackRow(rows[ri][0], rows[ri][1], rows[ri][2], ri===rows.length-1);
-    }
-    if(failed){
-      html += '<div class="upqFin fail">Upload stopped \u2014 nothing was published</div>';
-      html += '<div class="upqFailNote">Any transferred file has been removed from storage. Fix the issue above and upload again whenever you\u2019re ready.</div>';
-    } else if(j.stage==='live'){
-      html += '<div class="upqFin ok">Done \u2014 your artwork is live</div>';
-    } else {
-      html += '<div class="upqFin busy">Publishing your artwork now\u2026</div>';
-    }
-    body.innerHTML = html;
-  }
-
-  function upqBusy(){
-    for(var i = 0; i < upq.jobs.length; i++){
-      var st = upq.jobs[i].stage;
-      if(st === 'uploading' || st === 'finalizing') return true;
-    }
-    return false;
-  }
-  window.upqBusy = upqBusy;
-
-  window.addEventListener('beforeunload', function(e){
-    if(!upqBusy()) return;
-    e.preventDefault();
-    e.returnValue = '';
-    return '';
-  });

@@ -70,20 +70,20 @@
     return signJson.publicUrl;
   }
 
-  async function imgDerive(file, maxWidth, quality){
-    var bmp;
+  async function imgDecode(file){
     try{
-      bmp = await createImageBitmap(file);
+      return await createImageBitmap(file);
     }catch(e){
-      bmp = await new Promise(function(res, rej){
+      return await new Promise(function(res, rej){
         var url = URL.createObjectURL(file), im = new Image();
         im.onload  = function(){ URL.revokeObjectURL(url); res(im); };
         im.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('Could not decode image')); };
         im.src = url;
       });
     }
-    var sw = bmp.width || bmp.naturalWidth, sh = bmp.height || bmp.naturalHeight;
-    if(!sw || !sh) throw new Error('Could not read image size');
+  }
+
+  async function imgEncode(src, sw, sh, maxWidth, quality){
     var scale = Math.min(1, maxWidth / sw);
     var w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
     var cv = document.createElement('canvas');
@@ -91,15 +91,52 @@
     var cx = cv.getContext('2d');
     cx.imageSmoothingEnabled = true;
     cx.imageSmoothingQuality = 'high';
-    cx.drawImage(bmp, 0, 0, w, h);
-    if(bmp.close) try{ bmp.close(); }catch(e){}
+    cx.drawImage(src, 0, 0, w, h);
     var blob = await new Promise(function(res){ cv.toBlob(res, 'image/webp', quality); });
     if(!blob || blob.type !== 'image/webp'){
       blob = await new Promise(function(res){ cv.toBlob(res, 'image/jpeg', quality); });
     }
+      // A canvas holds its pixels until it is collected; zeroing it hands them back now, which a low-memory phone needs
+    cv.width = cv.height = 0;
     if(!blob) throw new Error('Could not encode image');
     return blob;
   }
+
+    // One decode for every size: decoding the full image once per size was the slow, memory-hungry part on phones
+  async function imgDeriveAll(file, roles){
+    var src = await imgDecode(file);
+    var out = {};
+    try{
+      var sw = src.width || src.naturalWidth, sh = src.height || src.naturalHeight;
+      if(!sw || !sh) throw new Error('Could not read image size');
+      for(var i = 0; i < roles.length; i++){
+        var spec = DERIVE_SPEC[roles[i]];
+        out[roles[i]] = await imgEncode(src, sw, sh, spec.width, spec.quality);
+      }
+    }finally{
+      if(src.close) try{ src.close(); }catch(e){}
+    }
+    return out;
+  }
+
+    // While anything is uploading, a reload would throw the transfer away before the post is saved.
+    // Pull-to-refresh is the easy one to hit on a phone, so it is switched off until the upload lands.
+  var dzUpHolds = 0;
+  function dzUploadHold(on){
+    dzUpHolds = Math.max(0, dzUpHolds + (on ? 1 : -1));
+    var v = dzUpHolds ? 'contain' : '';
+    try{
+      document.documentElement.style.overscrollBehaviorY = v;
+      if(document.body) document.body.style.overscrollBehaviorY = v;
+    }catch(e){}
+  }
+  window.dzUploadHold = dzUploadHold;
+  window.addEventListener('beforeunload', function(e){
+    if(!dzUpHolds) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  });
 
   var DERIVE_SPEC = {
     t300:  { width: 300,  quality: 0.55 },
@@ -115,30 +152,32 @@
     return UPLOAD_IMAGE_TYPES.indexOf(t) >= 0 ? t : 'application/octet-stream';
   }
 
-  async function sbUploadTargets(targets, file){
-    for(var i=0;i<targets.length;i++){
-      var t = targets[i];
-      var body = file, type = safeUploadType(file.type);
-      if(t.role && DERIVE_SPEC[t.role]){
-        var spec = DERIVE_SPEC[t.role];
-        body = await imgDerive(file, spec.width, spec.quality);
-        type = safeUploadType(body.type || 'image/webp');
-      }
-      var res;
-      try{
-        res = await fetch(t.signedUrl, {
-          method: 'PUT',
-          headers: { 'content-type': type, 'x-upsert': 'true' },
-          body: body
-        });
-      }catch(e){
-        throw new Error('Upload blocked by storage, check the bucket CORS policy');
-      }
-      if(!res.ok){
-        var detail = await res.text().catch(function(){ return ''; });
-        throw new Error('Upload failed ('+res.status+') on '+(t.role||'file')+(detail?': '+detail.slice(0,120):''));
-      }
+  async function sbPut(t, body){
+    var type = safeUploadType(body.type);
+    var res;
+    try{
+      res = await fetch(t.signedUrl, {
+        method: 'PUT',
+        headers: { 'content-type': type, 'x-upsert': 'true' },
+        body: body
+      });
+    }catch(e){
+      throw new Error('Upload blocked by storage, check the bucket CORS policy');
     }
+    if(!res.ok){
+      var detail = await res.text().catch(function(){ return ''; });
+      throw new Error('Upload failed ('+res.status+') on '+(t.role||'file')+(detail?': '+detail.slice(0,120):''));
+    }
+  }
+
+  async function sbUploadTargets(targets, file){
+    var roles = targets.map(function(t){ return t.role; })
+                       .filter(function(r){ return !!DERIVE_SPEC[r]; });
+    var sized = roles.length ? await imgDeriveAll(file, roles) : {};
+      // Every size is ready before the first byte leaves, so the transfers go out together: one wait instead of five in a row
+    await Promise.all(targets.map(function(t){
+      return sbPut(t, sized[t.role] || file);
+    }));
   }
   async function s3Delete(bucket, path){
     if(!path) return;
@@ -517,7 +556,6 @@
     { id:'dzUpWrap',        close:['dzUpClose'] },
     { id:'dzAcWrap',        close:['dzAcClose'] },
     { id:'dlQuotaMod',      close:['dzQuotaClose'] },
-    { id:'upqBackdrop',     close:['upqCloseModal'] },
     { id:'fgFltPanel',      close:['closeFilterPanel'] },
     { id:'fgFltOvr',        close:['closeFilterPanel'] },
     { id:'legalBackdrop',   close:['closeLegal'],           lock:1 },

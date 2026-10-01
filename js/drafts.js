@@ -488,7 +488,7 @@
         closePfUpload();
         openOwnProfile();
         if(typeof bnSetActive==='function') bnSetActive('bnProfile');
-        showToast('Verifying your artwork, watch it on your profile');
+        showToast('Uploading \u2014 it goes live on your profile in a moment');
       }
     }catch(err){ console.error('Error: '+err.message);
       if(window.meritDenied && window.meritDenied(err, 'upload')) return;

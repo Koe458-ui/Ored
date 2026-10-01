@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_VERSION = 'v264';
+const CACHE_VERSION = 'v265';
 
 const STATIC = `dz-static-${CACHE_VERSION}`;
 const THUMB  = `dz-img-thumb-${CACHE_VERSION}`;
@@ -42,11 +42,11 @@ const SHELL_URLS = [
   '/css/admin.css?v=14',
   '/css/auth.css?v=10',
   '/css/panels.css?v=36',
-  '/css/upload.css?v=30',
+  '/css/upload.css?v=31',
   '/css/widgets.css?v=35',
-  '/css/overrides.css?v=70',
+  '/css/overrides.css?v=71',
   '/css/ored.css?v=1',
-  '/css/select.css?v=5',
+  '/css/select.css?v=6',
   '/css/analytics.css?v=17',
 
   '/js/vendor/supabase-js-2.112.2.min.js',
@@ -66,7 +66,7 @@ const SHELL_URLS = [
   '/js/composer.js?v=3',
   '/js/share.js?v=4',
   '/js/misc-core.js?v=11',
-  '/js/app-core.js?v=63',
+  '/js/app-core.js?v=64',
   '/js/protect.js?v=4',
   '/js/gallery.js?v=116',
   '/js/fghead.js?v=12',
@@ -74,8 +74,8 @@ const SHELL_URLS = [
   '/js/follow.js?v=3',
   '/js/profile.js?v=33',
   '/js/albums.js?v=34',
-  '/js/drafts.js?v=14',
-  '/js/upqueue.js?v=11',
+  '/js/drafts.js?v=15',
+  '/js/upqueue.js?v=12',
   '/js/avatar.js?v=9',
   '/js/pfedit.js?v=26',
   '/js/mywork.js?v=33',
@@ -93,7 +93,7 @@ const SHELL_URLS = [
   '/js/hubs.js?v=5',
   '/js/secview.js?v=12',
   '/js/engagement.js?v=12',
-  '/js/sections.js?v=145',
+  '/js/sections.js?v=146',
   '/js/heropitch.js?v=5',
   '/js/routes.js?v=5',
   '/js/topnav.js?v=13',

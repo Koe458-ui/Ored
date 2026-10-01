@@ -48,8 +48,8 @@
        lands, so nothing has anything to animate. The `.open` rules are all a class
        more specific than these, so opening still wins.
        Anything added to those sheets with a hidden base state belongs here too. */
-    .upPop,.cropPop,.upGdPop,#upqBackdrop,#legalBackdrop{position:fixed;inset:0;opacity:0;pointer-events:none;}
-    .upGdPop,#upqBackdrop,#legalBackdrop{visibility:hidden;}
+    .upPop,.cropPop,.upGdPop,#legalBackdrop{position:fixed;inset:0;opacity:0;pointer-events:none;}
+    .upGdPop,#legalBackdrop{visibility:hidden;}
     #pfUpMod{opacity:1;transform:translateX(100%);visibility:hidden;}
     #rankHub,#rankPage,#fgSearchPage,#cmBrowsePage,#cmInfoPage,#cmChatPanel,
     #profilePage,#pfEditPage,#admPage,#pfMyWorkPage,#notifPage,#subPage,
@@ -158,12 +158,12 @@
   <link rel="stylesheet" href="/css/admin.css?v=14" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="/css/auth.css?v=10" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="/css/panels.css?v=36" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/css/upload.css?v=30" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="/css/upload.css?v=31" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="/css/widgets.css?v=35" media="print" onload="this.media='all'">
-  <link rel="stylesheet" href="/css/overrides.css?v=70">
+  <link rel="stylesheet" href="/css/overrides.css?v=71">
   <link rel="stylesheet" href="/css/ored.css?v=1">
-  <link rel="stylesheet" href="/css/select.css?v=5" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="/css/viewer.css?v=53"><link rel="stylesheet" href="/css/community.css?v=41"><link rel="stylesheet" href="/css/ranking.css?v=20"><link rel="stylesheet" href="/css/profile.css?v=51"><link rel="stylesheet" href="/css/admin.css?v=14"><link rel="stylesheet" href="/css/auth.css?v=10"><link rel="stylesheet" href="/css/upload.css?v=30"><link rel="stylesheet" href="/css/connect.css?v=20"><link rel="stylesheet" href="/css/panels.css?v=36"><link rel="stylesheet" href="/css/widgets.css?v=35"><link rel="stylesheet" href="/css/select.css?v=5"></noscript>
+  <link rel="stylesheet" href="/css/select.css?v=6" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="/css/viewer.css?v=53"><link rel="stylesheet" href="/css/community.css?v=41"><link rel="stylesheet" href="/css/ranking.css?v=20"><link rel="stylesheet" href="/css/profile.css?v=51"><link rel="stylesheet" href="/css/admin.css?v=14"><link rel="stylesheet" href="/css/auth.css?v=10"><link rel="stylesheet" href="/css/upload.css?v=31"><link rel="stylesheet" href="/css/connect.css?v=20"><link rel="stylesheet" href="/css/panels.css?v=36"><link rel="stylesheet" href="/css/widgets.css?v=35"><link rel="stylesheet" href="/css/select.css?v=6"></noscript>
  </head>
  <body>
 
@@ -845,17 +845,6 @@
       <button class="upBtnPri" onclick="confirmPfCrop()">Use This</button>
     </div>
    </div>
-  </div>
-
-  <div id="upqBackdrop" role="dialog" aria-modal="true" aria-label="Upload status" onclick="if(event.target===this)upqCloseModal()">
-    <div class="legalModal">
-      <div class="lmHead">
-        <div class="lmTitle" id="upqMTitle">UPLOAD STATUS</div>
-        <button class="lmClose" onclick="upqCloseModal()" aria-label="Close">✕</button>
-      </div>
-      <div class="upqMBody" id="upqMBody"></div>
-      <div class="upqMFoot"><button class="upqOkBtn" onclick="upqCloseModal()">OK</button></div>
-    </div>
   </div>
 
   <input type="file" id="pfAvatarFileInput" accept="image/*" style="display:none" onchange="handlePfAvBFile(event,'avatar')">
@@ -1987,7 +1976,7 @@
   <script defer src="/js/captcha.js?v=8"></script>
   <script defer src="/config.js"></script>
   <script defer src="/js/imagehash.js?v=1"></script>
-  <script defer src="/js/app-core.js?v=63"></script>
+  <script defer src="/js/app-core.js?v=64"></script>
   <script defer src="/js/protect.js?v=4"></script>
   <script defer src="/js/gallery.js?v=116"></script>
   <script defer src="/js/fghead.js?v=12"></script>
@@ -1995,8 +1984,8 @@
   <script defer src="/js/follow.js?v=3"></script>
   <script defer src="/js/profile.js?v=33"></script>
   <script defer src="/js/albums.js?v=34"></script>
-  <script defer src="/js/drafts.js?v=14"></script>
-  <script defer src="/js/upqueue.js?v=11"></script>
+  <script defer src="/js/drafts.js?v=15"></script>
+  <script defer src="/js/upqueue.js?v=12"></script>
   <script defer src="/js/avatar.js?v=9"></script>
   <script defer src="/js/pfedit.js?v=26"></script>
   <script defer src="/js/mywork.js?v=33"></script>
@@ -2396,7 +2385,7 @@
   <script defer src="/js/antrack.js?v=2"></script>
   <script defer src="/js/engagement.js?v=12"></script>
 
-  <script defer src="/js/sections.js?v=145"></script>
+  <script defer src="/js/sections.js?v=146"></script>
   <script defer src="/js/heropitch.js?v=5"></script>
   <script defer src="/js/routes.js?v=5"></script>
 
