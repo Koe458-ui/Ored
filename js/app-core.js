@@ -165,9 +165,14 @@
                        .filter(function(r){ return !!DERIVE_SPEC[r]; });
     var sized = roles.length ? await imgDeriveAll(file, roles) : {};
       // Every size is ready before the first byte leaves, so the transfers go out together: one wait instead of five in a row
-    await Promise.all(targets.map(function(t){
+      // allSettled, not all: one failure must not hand control to the caller's cleanup while the other
+      // transfers are still in flight, or a file that lands after the sweep is left behind
+    var done = await Promise.allSettled(targets.map(function(t){
       return sbPut(t, sized[t.role] || file);
     }));
+    for(var i = 0; i < done.length; i++){
+      if(done[i].status === 'rejected') throw done[i].reason;
+    }
   }
   async function s3Delete(bucket, path){
     if(!path) return;

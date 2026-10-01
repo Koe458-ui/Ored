@@ -188,11 +188,16 @@
       }, 1600);
       showToast('\u201C'+(job.name||'Artwork')+'\u201D is live');
     }catch(err){
-      if(!job.landed){
-        for(var d=0; d<job.uploadedPaths.length; d++){
-          try{ await s3Delete(BUCKET, job.uploadedPaths[d]); }
-          catch(e){ console.error('upq cleanup:', e.message); }
-        }
+      if(job.landed){
+          // The artwork row is in, so it is live: whatever broke afterwards is not a failed upload
+        console.error('upq after publish:', err && err.message);
+        upqRemove(job.id);
+        showToast('\u201C'+(job.name||'Artwork')+'\u201D is live');
+        return;
+      }
+      for(var d=0; d<job.uploadedPaths.length; d++){
+        try{ await s3Delete(BUCKET, job.uploadedPaths[d]); }
+        catch(e){ console.error('upq cleanup:', e.message); }
       }
       var why;
       if(err && /row-level security|violates row-level|42501/i.test((err.message||'')+' '+(err.code||''))){
