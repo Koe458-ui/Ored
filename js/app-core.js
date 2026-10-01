@@ -41,49 +41,39 @@
     const signJson = await signRes.json().catch(function(){return{};});
     if(!signRes.ok) throw new Error(signJson.error || ('Upload authorization failed ('+signRes.status+')'));
 
-    if(Array.isArray(signJson.targets) && signJson.targets.length){
-      await sbUploadTargets(signJson.targets, file);
-      if(opts){
-        var landed = null;
-        for(var ti=0; ti<signJson.targets.length; ti++){
-          if(signJson.targets[ti].role === 'file' || signJson.targets[ti].role === 'original'){
-            landed = signJson.targets[ti]; break;
-          }
+    if(!Array.isArray(signJson.targets) || !signJson.targets.length){
+      throw new Error('The upload service returned nowhere to upload to');
+    }
+    await sbUploadTargets(signJson.targets, file);
+    if(opts){
+      var landed = null;
+      for(var ti=0; ti<signJson.targets.length; ti++){
+        if(signJson.targets[ti].role === 'file' || signJson.targets[ti].role === 'original'){
+          landed = signJson.targets[ti]; break;
         }
-        opts.landed = landed
-          ? { bucket: landed.bucket || BUCKET, path: landed.path || path }
-          : { bucket: BUCKET, path: path };
       }
-      if(wantPrivate) return signJson.private === false ? (signJson.supabasePublicUrl || null) : null;
-      return signJson.supabasePublicUrl || signJson.publicUrl;
+      opts.landed = landed
+        ? { bucket: landed.bucket || BUCKET, path: landed.path || path }
+        : { bucket: BUCKET, path: path };
     }
-    if(wantPrivate) throw new Error('This upload service cannot store private files yet');
-
-    if(!signJson.uploadUrl) throw new Error('Upload service returned no uploadUrl');
-    let putRes;
-    try{
-      putRes = await fetch(signJson.uploadUrl, {method:'PUT', headers:{'content-type':safeUploadType(file.type)}, body:file});
-    }catch(e){
-      throw new Error('Upload blocked by the storage server — add this site\u2019s origin with PUT to the S3 bucket\u2019s CORS policy');
-    }
-    if(!putRes.ok) throw new Error('Upload failed ('+putRes.status+') — presigned URL rejected by S3');
-    return signJson.publicUrl;
+    if(wantPrivate) return signJson.private === false ? (signJson.supabasePublicUrl || null) : null;
+    return signJson.supabasePublicUrl;
   }
 
-  async function imgDerive(file, maxWidth, quality){
-    var bmp;
+  async function imgDecode(file){
     try{
-      bmp = await createImageBitmap(file);
+      return await createImageBitmap(file);
     }catch(e){
-      bmp = await new Promise(function(res, rej){
+      return await new Promise(function(res, rej){
         var url = URL.createObjectURL(file), im = new Image();
         im.onload  = function(){ URL.revokeObjectURL(url); res(im); };
         im.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('Could not decode image')); };
         im.src = url;
       });
     }
-    var sw = bmp.width || bmp.naturalWidth, sh = bmp.height || bmp.naturalHeight;
-    if(!sw || !sh) throw new Error('Could not read image size');
+  }
+
+  async function imgEncode(src, sw, sh, maxWidth, quality){
     var scale = Math.min(1, maxWidth / sw);
     var w = Math.max(1, Math.round(sw * scale)), h = Math.max(1, Math.round(sh * scale));
     var cv = document.createElement('canvas');
@@ -91,15 +81,52 @@
     var cx = cv.getContext('2d');
     cx.imageSmoothingEnabled = true;
     cx.imageSmoothingQuality = 'high';
-    cx.drawImage(bmp, 0, 0, w, h);
-    if(bmp.close) try{ bmp.close(); }catch(e){}
+    cx.drawImage(src, 0, 0, w, h);
     var blob = await new Promise(function(res){ cv.toBlob(res, 'image/webp', quality); });
     if(!blob || blob.type !== 'image/webp'){
       blob = await new Promise(function(res){ cv.toBlob(res, 'image/jpeg', quality); });
     }
+      // A canvas holds its pixels until it is collected; zeroing it hands them back now, which a low-memory phone needs
+    cv.width = cv.height = 0;
     if(!blob) throw new Error('Could not encode image');
     return blob;
   }
+
+    // One decode for every size: decoding the full image once per size was the slow, memory-hungry part on phones
+  async function imgDeriveAll(file, roles){
+    var src = await imgDecode(file);
+    var out = {};
+    try{
+      var sw = src.width || src.naturalWidth, sh = src.height || src.naturalHeight;
+      if(!sw || !sh) throw new Error('Could not read image size');
+      for(var i = 0; i < roles.length; i++){
+        var spec = DERIVE_SPEC[roles[i]];
+        out[roles[i]] = await imgEncode(src, sw, sh, spec.width, spec.quality);
+      }
+    }finally{
+      if(src.close) try{ src.close(); }catch(e){}
+    }
+    return out;
+  }
+
+    // While anything is uploading, a reload would throw the transfer away before the post is saved.
+    // Pull-to-refresh is the easy one to hit on a phone, so it is switched off until the upload lands.
+  var dzUpHolds = 0;
+  function dzUploadHold(on){
+    dzUpHolds = Math.max(0, dzUpHolds + (on ? 1 : -1));
+    var v = dzUpHolds ? 'contain' : '';
+    try{
+      document.documentElement.style.overscrollBehaviorY = v;
+      if(document.body) document.body.style.overscrollBehaviorY = v;
+    }catch(e){}
+  }
+  window.dzUploadHold = dzUploadHold;
+  window.addEventListener('beforeunload', function(e){
+    if(!dzUpHolds) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  });
 
   var DERIVE_SPEC = {
     t300:  { width: 300,  quality: 0.55 },
@@ -115,29 +142,36 @@
     return UPLOAD_IMAGE_TYPES.indexOf(t) >= 0 ? t : 'application/octet-stream';
   }
 
+  async function sbPut(t, body){
+    var type = safeUploadType(body.type);
+    var res;
+    try{
+      res = await fetch(t.signedUrl, {
+        method: 'PUT',
+        headers: { 'content-type': type, 'x-upsert': 'true' },
+        body: body
+      });
+    }catch(e){
+      throw new Error('Upload blocked by storage, check the bucket CORS policy');
+    }
+    if(!res.ok){
+      var detail = await res.text().catch(function(){ return ''; });
+      throw new Error('Upload failed ('+res.status+') on '+(t.role||'file')+(detail?': '+detail.slice(0,120):''));
+    }
+  }
+
   async function sbUploadTargets(targets, file){
-    for(var i=0;i<targets.length;i++){
-      var t = targets[i];
-      var body = file, type = safeUploadType(file.type);
-      if(t.role && DERIVE_SPEC[t.role]){
-        var spec = DERIVE_SPEC[t.role];
-        body = await imgDerive(file, spec.width, spec.quality);
-        type = safeUploadType(body.type || 'image/webp');
-      }
-      var res;
-      try{
-        res = await fetch(t.signedUrl, {
-          method: 'PUT',
-          headers: { 'content-type': type, 'x-upsert': 'true' },
-          body: body
-        });
-      }catch(e){
-        throw new Error('Upload blocked by storage, check the bucket CORS policy');
-      }
-      if(!res.ok){
-        var detail = await res.text().catch(function(){ return ''; });
-        throw new Error('Upload failed ('+res.status+') on '+(t.role||'file')+(detail?': '+detail.slice(0,120):''));
-      }
+    var roles = targets.map(function(t){ return t.role; })
+                       .filter(function(r){ return !!DERIVE_SPEC[r]; });
+    var sized = roles.length ? await imgDeriveAll(file, roles) : {};
+      // Every size is ready before the first byte leaves, so the transfers go out together: one wait instead of five in a row
+      // allSettled, not all: one failure must not hand control to the caller's cleanup while the other
+      // transfers are still in flight, or a file that lands after the sweep is left behind
+    var done = await Promise.allSettled(targets.map(function(t){
+      return sbPut(t, sized[t.role] || file);
+    }));
+    for(var i = 0; i < done.length; i++){
+      if(done[i].status === 'rejected') throw done[i].reason;
     }
   }
   async function s3Delete(bucket, path){
@@ -502,8 +536,10 @@
   }
   window.dzPaintLimits = dzPaintLimits;
 
+  var dzDomLoaded = document.readyState === 'complete';
+  document.addEventListener('DOMContentLoaded', function(){ dzDomLoaded = true; }, { once:true });
   function dzDomReady(){
-    if(document.readyState !== 'loading') return Promise.resolve();
+    if(dzDomLoaded) return Promise.resolve();
     return new Promise(function(res){
       document.addEventListener('DOMContentLoaded', function(){ res(); }, { once:true });
     });
@@ -517,7 +553,6 @@
     { id:'dzUpWrap',        close:['dzUpClose'] },
     { id:'dzAcWrap',        close:['dzAcClose'] },
     { id:'dlQuotaMod',      close:['dzQuotaClose'] },
-    { id:'upqBackdrop',     close:['upqCloseModal'] },
     { id:'fgFltPanel',      close:['closeFilterPanel'] },
     { id:'fgFltOvr',        close:['closeFilterPanel'] },
     { id:'legalBackdrop',   close:['closeLegal'],           lock:1 },
@@ -1136,6 +1171,41 @@
   var _dzArtistWanted = {};
   var _dzArtistFlight = {};
   var _dzArtistTimer  = null;
+
+  function dzOpenTab(path){
+    if(!path) return false;
+    var name = 'oredlab:' + path;
+    if(window.name === name) return false;
+    var w = null;
+    try{ w = window.open('', name); }catch(e){ w = null; }
+    if(!w) return false;
+    var at = null;
+    try{ at = w.location.pathname + w.location.search; }catch(e){ at = null; }
+    if(at !== path){
+      try{ w.location.href = path; }catch(e){ try{ w.close(); }catch(e2){} return false; }
+    }
+    try{ w.focus(); }catch(e){}
+    return true;
+  }
+  window.dzOpenTab = dzOpenTab;
+
+  function dzOpenTabWhen(find){
+    var w = null;
+    try{ w = window.open('', '_blank'); }catch(e){ w = null; }
+    if(!w) return null;
+    return Promise.resolve(find).then(function(path){
+      if(!path){ w.close(); return false; }
+      try{ w.name = 'oredlab:' + path; w.location.href = path; }catch(e){ w.close(); return false; }
+      return true;
+    }, function(){ w.close(); return false; });
+  }
+  window.dzOpenTabWhen = dzOpenTabWhen;
+
+  function dzCommissionTab(row){
+    return !!(row && row.id && row.item_type === 'commission' &&
+              dzOpenTab('/listing/' + encodeURIComponent(String(row.id))));
+  }
+  window.dzCommissionTab = dzCommissionTab;
 
   function dzBuildHoverReveal(uid){
     var frag = document.createDocumentFragment();

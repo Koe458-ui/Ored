@@ -307,16 +307,17 @@ The popup closes right away — your piece appears at the top of your gallery as
 2. ALMOST DONE — the piece is being published
 3. LIVE ✓ — a green check flashes and the real card takes over
 
-There is no review step in between: your artwork goes live the moment it finishes publishing. Tap the blurred card anytime to open the full step-by-step status. It usually takes just a few seconds.`
+There is no review step in between: your artwork goes live the moment it finishes publishing. It usually takes just a few seconds — keep the page open until the card turns LIVE.`
       },
       {
         question: "Why did my upload fail?",
         answer:
-`Uploads are not reviewed, so a failure is a technical one. The popup tells you the exact reason:
+`Uploads are not reviewed, so a failure is a technical one. A message at the bottom of the screen tells you the exact reason:
 
 1. Merit below 80 — uploads pause until your merit recovers (+2/day)
 2. The file could not be transferred — connection dropped, or the image is too large
 3. You were signed out mid-upload — sign back in and try again
+4. The page was closed or reloaded before the card turned LIVE — upload it again
 
 Nothing is published on a failed upload, and any transferred file is removed from storage automatically. Fix the issue and upload again whenever you're ready.`
       },
@@ -463,7 +464,7 @@ Open Explore → Resources in the top bar to browse them, and tap any card to se
 4. Fill in a title, description, category, licence and what you made it with
 5. Add tags and post
 
-The preview must show the actual asset — if it's turned away, see "Upload Checks & Rejections".`
+The preview must show the actual asset. It goes live as soon as you post it.`
       },
       {
         question: "How do I download a resource?",

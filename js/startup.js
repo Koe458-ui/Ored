@@ -32,8 +32,23 @@
     if(pm && stillBooting) openProfileByUsername(dzDecodeSeg(pm[1]), false);
     var sm = window.location.pathname.match(/^\/(resource|blog|listing)\/([^/]+)\/?$/);
     if(sm && stillBooting && typeof window.dzOpenById === 'function') window.dzOpenById(sm[1], sm[2]);
+    var dm = window.location.pathname === '/community' && new URLSearchParams(window.location.search).get('dm');
+    var cmOpen = document.getElementById('communityPage');
+    if(dm && cmOpen && cmOpen.classList.contains('open')) bootDm(dm);
     injectGallerySEO();
   })();
+
+  async function bootDm(uid){
+    try{ history.replaceState(history.state, '', '/community'); }catch(e){}
+    if(!/^[0-9a-f-]{36}$/i.test(uid) || !sb) return;
+    var res = await sb.auth.getSession().catch(function(){ return null; });
+    var signedIn = !!(res && res.data && res.data.session);
+    for(var i = 0; signedIn && !currentUser && i < 50; i++){
+      await new Promise(function(r){ setTimeout(r, 100); });
+    }
+    if(signedIn && !currentUser) return;
+    if(typeof window.dmOpenWith === 'function') window.dmOpenWith(uid);
+  }
 
   function injectGallerySEO(){
     if(!images.length) return;

@@ -25,7 +25,7 @@ input, textarea, select, option,
 .dzvFileName,
 .dzPTitle, .dzPExc,
 
-.upDraftTitle, .upPvVal, .upqTrkName,
+.upDraftTitle, .upPvVal,
 
 .admCardTitle, .admCardBody {
   -webkit-touch-callout: default;

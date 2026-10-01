@@ -268,11 +268,15 @@
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
       card.setAttribute('aria-label', 'View profile of ' + name);
-      card.onclick = function(){ openProfileByUsername(user, true); };
+      var go = function(){
+        if(window.dzOpenTab && window.dzOpenTab('/profile/' + encodeURIComponent(user))) return;
+        openProfileByUsername(user, true);
+      };
+      card.onclick = go;
       card.onkeydown = function(e){
         if(e.key !== 'Enter' && e.key !== ' ') return;
         e.preventDefault();
-        openProfileByUsername(user, true);
+        go();
       };
     } else {
       card.classList.add('atDead');

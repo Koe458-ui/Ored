@@ -4,10 +4,10 @@
   var ROUTES = {
     '/':            { panel: null,            open: home },
     '/explore':     { panel: 'fg',            open: gallery('artworks'),    section: 'artworks' },
-    '/marketplace': { panel: 'fg',            open: gallery('marketplace'), section: 'marketplace' },
-    '/resources':   { panel: 'fg',            open: gallery('resources'),   section: 'resources' },
-    '/blog':        { panel: 'fg',            open: gallery('blog'),        section: 'blog' },
-    '/community':   { panel: 'communityPage', open: community },
+    '/marketplace': { panel: 'fg',            open: gallery('marketplace'), section: 'marketplace', tab: true },
+    '/resources':   { panel: 'fg',            open: gallery('resources'),   section: 'resources',   tab: true },
+    '/blog':        { panel: 'fg',            open: gallery('blog'),        section: 'blog',        tab: true },
+    '/community':   { panel: 'communityPage', open: community,                                      tab: true },
     '/login':       { panel: null,            open: login, foreign: true }
   };
 
@@ -171,8 +171,18 @@
     if (a.origin !== window.location.origin) return;
     if (!ROUTES[a.pathname] || a.search || a.hash) return;
     e.preventDefault();
+    if (tab(a.pathname)) return;
     enter(a.pathname);
   });
+
+  function tab(path) {
+    var r = ROUTES[path];
+    return !!(r && r.tab && window.dzOpenTab && window.dzOpenTab(path));
+  }
+  window.dzRouteTab = function (path) {
+    if (tab(path)) return true;
+    return window.dzRouteGo(path);
+  };
 
   function chipMoved() {
     if (opening || !owns) return;

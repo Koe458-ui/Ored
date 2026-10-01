@@ -17,11 +17,11 @@
       api: ['openPfShare', 'closePfShare', 'pfShareCopy', 'pfShareNative']
     },
     zeo: {
-      src: ['/aiAssistantData.js?v=7', '/js/zeo.js?v=6'],
+      src: ['/aiAssistantData.js?v=8', '/js/zeo.js?v=6'],
       api: ['zeoOpen', 'zeoHide']
     },
     secview: {
-      src: ['/js/secview.js?v=12'],
+      src: ['/js/secview.js?v=13'],
       warm: true,
       api: ['dzOpenById', 'dzOpenRow', 'dzOpenView', 'dzOpenArtwork', 'dzOpenListing',
             'dzVwFill', 'dzVwCard', 'dzVwActRow', 'dzResourceDownload', 'dzReportItem',

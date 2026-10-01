@@ -183,7 +183,6 @@ for (const f of ['functions/api/paypal.js', 'functions/api/paypal-webhook.js']) 
   falsy('no PUT still sends the raw file.type',
         /'content-type'\s*:\s*(file|body)\.type/.test(src));
   truthy('the signed-target PUT normalises', /'content-type':\s*type,/.test(src));
-  truthy('the legacy PUT normalises', /'content-type':safeUploadType\(file\.type\)/.test(src));
 }
 
 {

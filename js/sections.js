@@ -289,7 +289,7 @@
         ? '<img loading="lazy" decoding="async" '+dzThumbAttrs(r.preview_url)+' alt="'+esc(r.title)+'">'
         : '<span class="dzExt">'+esc((r.item_type||'ITEM').toUpperCase())+'</span>';
       var hasFile = r.file_ext ? 1 : 0;
-      return '<div class="dzCard" data-id="'+id+'" onclick="dzOpenView(\'marketplace\',\''+id+'\')">'+
+      return '<div class="dzCard" data-id="'+id+'" onclick="dzOpenMarket(\''+id+'\')">'+
         '<div class="dzThumb">'+mt+'<span class="dzBadge">'+esc((r.item_type||'').toUpperCase())+'</span></div>'+
         '<div class="dzBody"><div class="dzName">'+esc(r.title)+'</div>'+
         (r.summary ? '<div class="dzHint">'+esc(r.summary)+'</div>' : '')+
@@ -432,7 +432,7 @@
          options:YES_NO_PLAIN, def:'no'},
         {k:'is_mature', t:'sel', slot:4, label:'Mature content', req:true,
          options:YES_NO_PLAIN, def:'no',
-         hint:'Say so if it is. The review also marks work it judges mature.'},
+         hint:'Say so if it is.'},
         {k:'credits', t:'list', slot:4, cap:20, imin:2, imax:300,
          label:'Credits / collaborators', ph:'Name and role, then press Enter',
          hint:'Models, assistants, client, team.'},
@@ -455,7 +455,7 @@
          mb:'asset', hint:'ZIP, PSD, ABR, brushset, fonts, 3D — up to 200MB.'},
         {k:'preview',t:'image', label:'Preview image', req:true,
          accept:'image/jpeg,image/png,image/webp,image/gif',
-         hint:'Required. Shown on the card and auto-checked. JPG/PNG/WEBP/GIF up to 25MB.'},
+         hint:'Required. Shown on the card. JPG/PNG/WEBP/GIF up to 25MB.'},
         {k:'title',  t:'text',  label:'Title', req:true, min:3, max:100, ph:'Name your resource…'},
         {k:'summary',t:'text',  label:'Short summary', req:true, min:20, max:250,
          ph:'One line — what it is and who it is for.',
@@ -535,7 +535,7 @@
         {k:'tags',   t:'tags',  label:'Tags', max:30},
         {k:'preview',t:'image', label:'Preview image', req:true,
          accept:'image/jpeg,image/png,image/webp,image/gif',
-         hint:'Required. Shown on the card and auto-checked. JPG/PNG/WEBP up to 25MB.'},
+         hint:'Required. Shown on the card. JPG/PNG/WEBP up to 25MB.'},
         {k:'gallery',t:'images', label:'Additional preview images',
          accept:'image/jpeg,image/png,image/webp,image/gif',
          hint:'Optional. Up to 8 more shots, shown on the listing page. 25MB each.'},
@@ -1163,7 +1163,7 @@
           '<button type="button" class="upBtnSec" id="dzDraftBtn-'+sec+'" onclick="dzSaveDraft(\''+sec+'\')">💾 Save Draft</button>'+
           '<button type="button" class="upBtnPri" id="dzSubmit-'+sec+'" onclick="dzSubmit(\''+sec+'\')">📤 Publish</button>'+
         '</div>'+
-        '<p class="dzHint" style="margin-top:.9rem">Posts are reviewed before they appear publicly.</p>'+
+        '<p class="dzHint" style="margin-top:.9rem">Posts go live as soon as you publish.</p>'+
       '</div></div>'+
       '<aside class="dzUpSide">'+
         '<div class="upSideCard">'+
@@ -2381,7 +2381,7 @@
     dd:'dzSchedDd', h:'dzSchedH', m:'dzSchedM', grid:'dzSchedGrid',
     mon:'dzSchedMon', lbl:'dzSchedLbl', hint:'dzSchedHint', val:'dzSchedVal',
     pick:'dzSchPick', iso:false, fmt:function(v){ return dzFmtWhen(v); },
-    tail:'verified now, published at the set time.'
+    tail:'it goes live on its own then.'
   };
   function dzSchToggle(e){
     if(e) e.stopPropagation();
@@ -2617,59 +2617,6 @@
     dzCountPaint(el);
   }
 
-  var dzV = {
-    title:'', transfer:'', publish:'', failReason:null,
-    recvLabel:'File & preview received',
-    reset:function(t){
-      this.title=t||'Upload';
-      this.transfer=''; this.publish=''; this.publishSub=''; this.failReason=null;
-    },
-    open:function(t, recv){
-      this.reset(t);
-      this.recvLabel = recv || 'File & preview received';
-      var bd=document.getElementById('upqBackdrop'); if(bd) bd.classList.add('open');
-      this.render();
-    },
-    close:function(){
-      if(typeof upqCloseModal==='function'){ upqCloseModal(); return; }
-      var bd=document.getElementById('upqBackdrop'); if(bd) bd.classList.remove('open');
-    },
-    step:function(k,state,sub){ this[k]=state; if(sub!=null) this[k+'Sub']=sub; this.render(); },
-    fail:function(reason){
-      this.failReason=reason;
-      var bd=document.getElementById('upqBackdrop'); if(bd) bd.classList.add('open');
-      this.render();
-    },
-    render:function(){
-      var t=document.getElementById('upqMTitle'), b=document.getElementById('upqMBody');
-      if(!t||!b) return;
-      var trk=(typeof upqTrackRow==='function') ? upqTrackRow
-              : function(st,n,sub){ return '<div>'+esc(n)+'</div>'; };
-      var failed=!!this.failReason, html='';
-      t.textContent = failed ? 'UPLOAD FAILED' : 'UPLOAD STATUS';
-      if(failed){
-        html+='<div class="upqFailBox"><div class="upqFailIco">!</div>'+
-          '<div><div class="upqFailTitle">\u201C'+esc(this.title||'Untitled')+'\u201D was not published</div>'+
-          '<div class="upqFailReason">'+esc(this.failReason)+'</div></div></div>';
-      }
-      html+=trk('pass','Upload received','',false);
-      html+=trk('pass', this.recvLabel || 'File & preview received', '', false);
-      html+=trk(this.transfer,'Secure transfer','',false);
-      var pubSub = (this.publish==='pass') ? (this.publishSub || 'It\u2019s live') : '';
-      var sched  = /^Scheduled/.test(this.publishSub || '');
-      html+=trk(this.publish,'Publish', pubSub, true);
-      if(failed){
-        html+='<div class="upqFin fail">Upload stopped \u2014 nothing was published</div>';
-        html+='<div class="upqFailNote">Any transferred file has been removed. Fix the issue above and publish again whenever you\u2019re ready.</div>';
-      } else if(this.publish==='pass'){
-        html+='<div class="upqFin ok">'+(sched ? 'Done \u2014 '+esc(this.publishSub) : 'Done \u2014 it\u2019s live')+'</div>';
-      } else {
-        html+='<div class="upqFin busy">Publishing your upload now\u2026</div>';
-      }
-      b.innerHTML=html;
-    }
-  };
-
   async function dzSubmit(sec){
     if(!sb){ showToast('Backend not configured'); return; }
     if(!window.currentUser){
@@ -2694,19 +2641,11 @@
     if(bad){ dzFieldFail(sec, bad.k, bad.msg); return; }
 
     if(btn){ btn.disabled = true; btn.textContent = 'Publishing…'; }
-    var trackImg = null, trackRecv = 'File & preview received';
-    if(sec === 'resources' || sec === 'marketplace'){ trackImg = st(sec).files.preview; }
-    else if(sec === 'blog'){ trackImg = st(sec).files.cover; trackRecv = 'Cover image received'; }
-    var tracked = !!trackImg;
-      // Every object this submit puts in storage, so a submit that fails on the way to the database takes them back out —
-      // the failure panel says so. Declared out here because the catch reads it however early the throw came.
+      // Every object this submit puts in storage, so a submit that fails on the way to the database takes them back out.
+      // Declared out here because the catch reads it however early the throw came.
     var landedFiles = [];
+    dzUploadHold(true);
     try{
-      if(tracked){
-        dzV.open(val(sec,'title') || SEC[sec].noun, trackRecv);
-        dzV.step('transfer','run');
-      }
-
       var stamp = Date.now();
       var base  = safeSlug(val(sec,'title') || sec, 60) || sec;
 
@@ -2714,8 +2653,9 @@
         var f = s.files[key]; if(!f) return null;
         var ext = safeSlug((f.name.split('.').pop()||'bin'), 10);
         var path = prefix+'/'+currentUser.id+'/'+stamp+'_'+base+'.'+ext;
-        var url  = await s3Upload(BUCKET, path, f);
+          // Listed before the transfer: if it fails halfway, whatever did land is still swept up by the catch
         landedFiles.push({bucket: BUCKET, path: path});
+        var url  = await s3Upload(BUCKET, path, f);
         return {url:url, path:path, name:f.name, ext:ext, size:f.size};
       }
 
@@ -2723,15 +2663,14 @@
         var ext = safeSlug((f.name.split('.').pop()||'bin'), 10);
         var path = prefix+'/'+currentUser.id+'/'+stamp+'_'+i+'_'+safeSlug(f.name.replace(/\.[^.]+$/,''), 40)+'.'+ext;
         var opts = {private:true};
+        landedFiles.push({bucket: BUCKET, path: path});
         await s3Upload(BUCKET, path, f, opts);
         var landed = opts.landed || {};
-        var out = {
+        return {
           bucket: landed.bucket || 'koe-originals',
           path: landed.path || path,
           name: f.name, ext: ext, size: f.size, mime: f.type || null
         };
-        landedFiles.push({bucket: out.bucket, path: out.path});
-        return out;
       }
 
       var pendingMedia = [];
@@ -2763,7 +2702,7 @@
         row.dimensions = rDims;
         dzSeoInto(row, val(sec,'title'), val(sec,'summary'), val(sec,'description'), stamp);
         if(rp){ row.preview_url = rp.url; row.preview_storage_path = rp.path; }
-        pendingMedia.push({ fileKind:'resourceFile', url:rf.url, path:rf.path, file:s.files.file });
+        pendingMedia.push({ fileKind:'resourceFile', url:rf.url, path:rf.path, file:s.files.file, private:true });
         if(rp) pendingMedia.push({ imageKind:'resourceImage', url:rp.url, path:rp.path, file:s.files.preview });
       }
       else if(sec === 'blog'){
@@ -2836,9 +2775,11 @@
         for(var gi = 0; gi < gal.length; gi++){
           var gext = safeSlug((gal[gi].name.split('.').pop()||'jpg'), 10);
           var gpath = 'market/'+currentUser.id+'/'+stamp+'_g'+gi+'_'+base+'.'+gext;
+          landedFiles.push({bucket: BUCKET, path: gpath});
           var gurl = await s3Upload(BUCKET, gpath, gal[gi]);
           galRows.push({ url:gurl, path:gpath, name:gal[gi].name, size:gal[gi].size });
-          pendingMedia.push({ imageKind:'marketImage', url:gurl, path:gpath, file:gal[gi] });
+            // The preview is image 0, so the extra images follow it in the order they were picked
+          pendingMedia.push({ imageKind:'marketImage', url:gurl, path:gpath, file:gal[gi], position:gi+1 });
         }
 
         dzCopy(sec, row,
@@ -2867,11 +2808,10 @@
           row.file_size = totalBytes;
         }
         if(mp){ row.preview_url = mp.url; row.preview_storage_path = mp.path; }
-        if(mp) pendingMedia.push({ imageKind:'marketImage', url:mp.url, path:mp.path, file:s.files.preview });
+        if(mp) pendingMedia.push({ imageKind:'marketImage', url:mp.url, path:mp.path, file:s.files.preview, position:0 });
       }
       var when = dzSchPicked();
       if(when){
-        if(tracked){ dzV.step('transfer','pass'); dzV.step('publish','run'); }
         var payload = {}; for(var pk in row){ if(pk!=='status') payload[pk]=row[pk]; }
         var paths = [];
         ['file_storage_path','preview_storage_path','cover_storage_path'].forEach(function(k){ if(row[k]) paths.push(row[k]); });
@@ -2885,13 +2825,11 @@
           }) : null
         }).select('id').single();
         if(sres.error) throw sres.error;
-        if(tracked){ dzV.step('publish','pass','Scheduled for '+dzFmtWhen(when)); setTimeout(function(){ dzV.close(); }, 1400); }
         showToast('Scheduled for '+dzFmtWhen(when));
         dzResetForm(sec);
         return;
       }
 
-      if(tracked){ dzV.step('transfer','pass'); dzV.step('publish','run'); }
       var res = await sb.from(SEC[sec].table).insert(row).select('id').single();
       if(res.error) throw res.error;
 
@@ -2922,7 +2860,6 @@
         }
       }
 
-      if(tracked){ dzV.step('publish','pass'); setTimeout(function(){ dzV.close(); }, 1400); }
       showToast('Published');
       dzResetForm(sec);
       dzLoaded[sec] = false;
@@ -2933,9 +2870,9 @@
         try{ await s3Delete(landedFiles[ci].bucket, landedFiles[ci].path); }
         catch(sweep){ console.error('publish cleanup:', (sweep && sweep.message) || sweep); }
       }
-      if(tracked){ dzV.fail((err && err.message) ? err.message : 'Could not publish'); }
-      else { showToast((err && err.message) ? err.message : 'Could not publish'); }
+      showToast((err && err.message) ? err.message : 'Could not publish');
     }finally{
+      dzUploadHold(false);
       if(btn){ btn.disabled = false; btn.textContent = '📤 Publish'; }
     }
   }
@@ -3048,6 +2985,11 @@
   window.dzSchClear      = dzSchClear;
   window.dzSchDone       = dzSchDone;
   window.dzGetRows = function(sec){ return dzSecRows[sec] || []; };
+  window.dzOpenMarket = function(id){
+    var row = (dzSecRows.marketplace || []).filter(function(x){ return String(x.id) === String(id); })[0];
+    if(window.dzCommissionTab && window.dzCommissionTab(row)) return;
+    dzOpenView('marketplace', id);
+  };
   window.dzSecReset = function(sec){
     if(sec){ delete dzSecRows[sec]; dzLoaded[sec] = false; dzBusy[sec] = false; }
     var host = sec && document.getElementById('fgSecC-'+sec);
