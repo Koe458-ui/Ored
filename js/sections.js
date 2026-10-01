@@ -455,7 +455,7 @@
          mb:'asset', hint:'ZIP, PSD, ABR, brushset, fonts, 3D — up to 200MB.'},
         {k:'preview',t:'image', label:'Preview image', req:true,
          accept:'image/jpeg,image/png,image/webp,image/gif',
-         hint:'Required. Shown on the card and auto-checked. JPG/PNG/WEBP/GIF up to 25MB.'},
+         hint:'Required. Shown on the card. JPG/PNG/WEBP/GIF up to 25MB.'},
         {k:'title',  t:'text',  label:'Title', req:true, min:3, max:100, ph:'Name your resource…'},
         {k:'summary',t:'text',  label:'Short summary', req:true, min:20, max:250,
          ph:'One line — what it is and who it is for.',
@@ -535,7 +535,7 @@
         {k:'tags',   t:'tags',  label:'Tags', max:30},
         {k:'preview',t:'image', label:'Preview image', req:true,
          accept:'image/jpeg,image/png,image/webp,image/gif',
-         hint:'Required. Shown on the card and auto-checked. JPG/PNG/WEBP up to 25MB.'},
+         hint:'Required. Shown on the card. JPG/PNG/WEBP up to 25MB.'},
         {k:'gallery',t:'images', label:'Additional preview images',
          accept:'image/jpeg,image/png,image/webp,image/gif',
          hint:'Optional. Up to 8 more shots, shown on the listing page. 25MB each.'},
@@ -1163,7 +1163,7 @@
           '<button type="button" class="upBtnSec" id="dzDraftBtn-'+sec+'" onclick="dzSaveDraft(\''+sec+'\')">💾 Save Draft</button>'+
           '<button type="button" class="upBtnPri" id="dzSubmit-'+sec+'" onclick="dzSubmit(\''+sec+'\')">📤 Publish</button>'+
         '</div>'+
-        '<p class="dzHint" style="margin-top:.9rem">Posts are reviewed before they appear publicly.</p>'+
+        '<p class="dzHint" style="margin-top:.9rem">Posts go live as soon as you publish.</p>'+
       '</div></div>'+
       '<aside class="dzUpSide">'+
         '<div class="upSideCard">'+
@@ -2381,7 +2381,7 @@
     dd:'dzSchedDd', h:'dzSchedH', m:'dzSchedM', grid:'dzSchedGrid',
     mon:'dzSchedMon', lbl:'dzSchedLbl', hint:'dzSchedHint', val:'dzSchedVal',
     pick:'dzSchPick', iso:false, fmt:function(v){ return dzFmtWhen(v); },
-    tail:'verified now, published at the set time.'
+    tail:'it goes live on its own then.'
   };
   function dzSchToggle(e){
     if(e) e.stopPropagation();
@@ -2653,8 +2653,9 @@
         var f = s.files[key]; if(!f) return null;
         var ext = safeSlug((f.name.split('.').pop()||'bin'), 10);
         var path = prefix+'/'+currentUser.id+'/'+stamp+'_'+base+'.'+ext;
-        var url  = await s3Upload(BUCKET, path, f);
+          // Listed before the transfer: if it fails halfway, whatever did land is still swept up by the catch
         landedFiles.push({bucket: BUCKET, path: path});
+        var url  = await s3Upload(BUCKET, path, f);
         return {url:url, path:path, name:f.name, ext:ext, size:f.size};
       }
 
@@ -2662,15 +2663,14 @@
         var ext = safeSlug((f.name.split('.').pop()||'bin'), 10);
         var path = prefix+'/'+currentUser.id+'/'+stamp+'_'+i+'_'+safeSlug(f.name.replace(/\.[^.]+$/,''), 40)+'.'+ext;
         var opts = {private:true};
+        landedFiles.push({bucket: BUCKET, path: path});
         await s3Upload(BUCKET, path, f, opts);
         var landed = opts.landed || {};
-        var out = {
+        return {
           bucket: landed.bucket || 'koe-originals',
           path: landed.path || path,
           name: f.name, ext: ext, size: f.size, mime: f.type || null
         };
-        landedFiles.push({bucket: out.bucket, path: out.path});
-        return out;
       }
 
       var pendingMedia = [];
@@ -2702,7 +2702,7 @@
         row.dimensions = rDims;
         dzSeoInto(row, val(sec,'title'), val(sec,'summary'), val(sec,'description'), stamp);
         if(rp){ row.preview_url = rp.url; row.preview_storage_path = rp.path; }
-        pendingMedia.push({ fileKind:'resourceFile', url:rf.url, path:rf.path, file:s.files.file });
+        pendingMedia.push({ fileKind:'resourceFile', url:rf.url, path:rf.path, file:s.files.file, private:true });
         if(rp) pendingMedia.push({ imageKind:'resourceImage', url:rp.url, path:rp.path, file:s.files.preview });
       }
       else if(sec === 'blog'){
@@ -2775,9 +2775,11 @@
         for(var gi = 0; gi < gal.length; gi++){
           var gext = safeSlug((gal[gi].name.split('.').pop()||'jpg'), 10);
           var gpath = 'market/'+currentUser.id+'/'+stamp+'_g'+gi+'_'+base+'.'+gext;
+          landedFiles.push({bucket: BUCKET, path: gpath});
           var gurl = await s3Upload(BUCKET, gpath, gal[gi]);
           galRows.push({ url:gurl, path:gpath, name:gal[gi].name, size:gal[gi].size });
-          pendingMedia.push({ imageKind:'marketImage', url:gurl, path:gpath, file:gal[gi] });
+            // The preview is image 0, so the extra images follow it in the order they were picked
+          pendingMedia.push({ imageKind:'marketImage', url:gurl, path:gpath, file:gal[gi], position:gi+1 });
         }
 
         dzCopy(sec, row,
@@ -2806,7 +2808,7 @@
           row.file_size = totalBytes;
         }
         if(mp){ row.preview_url = mp.url; row.preview_storage_path = mp.path; }
-        if(mp) pendingMedia.push({ imageKind:'marketImage', url:mp.url, path:mp.path, file:s.files.preview });
+        if(mp) pendingMedia.push({ imageKind:'marketImage', url:mp.url, path:mp.path, file:s.files.preview, position:0 });
       }
       var when = dzSchPicked();
       if(when){

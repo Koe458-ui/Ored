@@ -61,7 +61,7 @@ const SHELL_URLS = [
   '/js/ranking.js?v=10',
   '/js/community.js?v=10',
   '/js/dm.js?v=18',
-  '/aiAssistantData.js?v=7',
+  '/aiAssistantData.js?v=8',
   '/js/zeo.js?v=6',
   '/js/composer.js?v=3',
   '/js/share.js?v=4',
@@ -87,7 +87,7 @@ const SHELL_URLS = [
   '/js/legal-content.js?v=5',
   '/js/theme.js?v=10',
   '/js/antrack.js?v=2',
-  '/js/lazy.js?v=18',
+  '/js/lazy.js?v=19',
 
   '/js/analytics.js?v=24',
   '/js/hubs.js?v=5',

@@ -17,7 +17,7 @@
       api: ['openPfShare', 'closePfShare', 'pfShareCopy', 'pfShareNative']
     },
     zeo: {
-      src: ['/aiAssistantData.js?v=7', '/js/zeo.js?v=6'],
+      src: ['/aiAssistantData.js?v=8', '/js/zeo.js?v=6'],
       api: ['zeoOpen', 'zeoHide']
     },
     secview: {

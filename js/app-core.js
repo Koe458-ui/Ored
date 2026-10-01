@@ -41,33 +41,23 @@
     const signJson = await signRes.json().catch(function(){return{};});
     if(!signRes.ok) throw new Error(signJson.error || ('Upload authorization failed ('+signRes.status+')'));
 
-    if(Array.isArray(signJson.targets) && signJson.targets.length){
-      await sbUploadTargets(signJson.targets, file);
-      if(opts){
-        var landed = null;
-        for(var ti=0; ti<signJson.targets.length; ti++){
-          if(signJson.targets[ti].role === 'file' || signJson.targets[ti].role === 'original'){
-            landed = signJson.targets[ti]; break;
-          }
+    if(!Array.isArray(signJson.targets) || !signJson.targets.length){
+      throw new Error('The upload service returned nowhere to upload to');
+    }
+    await sbUploadTargets(signJson.targets, file);
+    if(opts){
+      var landed = null;
+      for(var ti=0; ti<signJson.targets.length; ti++){
+        if(signJson.targets[ti].role === 'file' || signJson.targets[ti].role === 'original'){
+          landed = signJson.targets[ti]; break;
         }
-        opts.landed = landed
-          ? { bucket: landed.bucket || BUCKET, path: landed.path || path }
-          : { bucket: BUCKET, path: path };
       }
-      if(wantPrivate) return signJson.private === false ? (signJson.supabasePublicUrl || null) : null;
-      return signJson.supabasePublicUrl || signJson.publicUrl;
+      opts.landed = landed
+        ? { bucket: landed.bucket || BUCKET, path: landed.path || path }
+        : { bucket: BUCKET, path: path };
     }
-    if(wantPrivate) throw new Error('This upload service cannot store private files yet');
-
-    if(!signJson.uploadUrl) throw new Error('Upload service returned no uploadUrl');
-    let putRes;
-    try{
-      putRes = await fetch(signJson.uploadUrl, {method:'PUT', headers:{'content-type':safeUploadType(file.type)}, body:file});
-    }catch(e){
-      throw new Error('Upload blocked by the storage server — add this site\u2019s origin with PUT to the S3 bucket\u2019s CORS policy');
-    }
-    if(!putRes.ok) throw new Error('Upload failed ('+putRes.status+') — presigned URL rejected by S3');
-    return signJson.publicUrl;
+    if(wantPrivate) return signJson.private === false ? (signJson.supabasePublicUrl || null) : null;
+    return signJson.supabasePublicUrl;
   }
 
   async function imgDecode(file){

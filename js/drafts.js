@@ -114,7 +114,7 @@
     dd:'pfUpSchedDd', h:'pfUpSchedH', m:'pfUpSchedM', grid:'pfUpSchedGrid',
     mon:'pfUpSchedMon', lbl:'pfUpSchedLbl', hint:'pfUpSchedHint', val:'pfUpSched',
     pick:'pfSchedPick', iso:true, fmt:function(v){ return uschFmt(v); },
-    tail:'verified now, re-checked at publish.'
+    tail:'it goes live on its own then.'
   };
   function pfSchedToggle(e){
     if(e){ e.stopPropagation(); }
@@ -209,11 +209,13 @@
   async function uschCancel(id, e){
     if(e){ e.stopPropagation(); }
     try{
-      var got = await sb.from('scheduled_uploads').select('storage_path').eq('id', id).single();
+      var got = await sb.from('scheduled_uploads').select('storage_path,extra').eq('id', id).single();
       var del = await sb.from('scheduled_uploads').delete().eq('id', id);
       if(del && del.error) throw del.error;
-      if(got && got.data && got.data.storage_path){
-        try{ await s3Delete(BUCKET, got.data.storage_path); }catch(_){}
+      var d = (got && got.data) || {};
+      var paths = [d.storage_path].concat((d.extra && Array.isArray(d.extra.page_paths)) ? d.extra.page_paths : []);
+      for(var pi = 0; pi < paths.length; pi++){
+        if(paths[pi]) try{ await s3Delete(BUCKET, paths[pi]); }catch(_){}
       }
       uschLoad();
       showToast('Schedule cancelled');
@@ -465,7 +467,6 @@
         if(typeof window.dzGalleryStore === 'function') window.dzGalleryStore();
         closePfUpload(); showToast('Artwork updated');
       } else {
-        var prevEl = document.getElementById('pfUpPrev');
         var _schedAt = _when;
         upqStart({
           name: nm, desc: desc, tags: tags, software: software,
@@ -474,7 +475,6 @@
           file: pf.upFile,
           pageFiles: (pf.upPageFiles || []).slice(),
           thumbFocus: pf.upThumbFocus ? { x: pf.upThumbFocus.x, y: pf.upThumbFocus.y, z: pf.upThumbFocus.z || 1 } : { x: 50, y: 50, z: 1 },
-          preview: (prevEl && prevEl.src) ? prevEl.src : '',
           albums: (pf.upAlbums || []).slice(),
           publishAt: _schedAt
         });

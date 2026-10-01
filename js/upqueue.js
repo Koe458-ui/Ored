@@ -9,7 +9,9 @@
       name: snap.name, desc: snap.desc, tags: snap.tags, cats: snap.cats,
       software: snap.software, file: snap.file, pageFiles: snap.pageFiles,
       extra: snap.extra || {},
-      thumbFocus: snap.thumbFocus, preview: snap.preview,
+        // The card's own handle on the image: a draft's preview URL is revoked when the drafts strip redraws,
+        // and the form's data: URL is the whole image as text, re-rendered on every progress step
+      thumbFocus: snap.thumbFocus, preview: URL.createObjectURL(snap.file),
       albums: (snap.albums || []).slice(),
       publishAt: snap.publishAt || '',
       upDone: 0, upTotal: 1 + snap.pageFiles.length,
@@ -23,7 +25,10 @@
 
   function upqRemove(id){
     var i = upq.jobs.findIndex(function(j){ return j.id===id; });
-    if(i!==-1) upq.jobs.splice(i,1);
+    if(i!==-1){
+      try{ URL.revokeObjectURL(upq.jobs[i].preview); }catch(e){}
+      upq.jobs.splice(i,1);
+    }
     upqSync();
   }
 
@@ -65,16 +70,17 @@
       var uniq = Date.now()+'_'+job.id.split('_')[1];
       var ext = safeSlug(job.file.name.split('.').pop(), 8) || 'jpg';
       var path = 'artworks/'+currentUser.id+'/'+uniq+'_'+safeSlug(job.name)+'.'+ext;
-      const publicUrl = await s3Upload(BUCKET, path, job.file);
+        // Listed before the transfer: if it fails halfway, whatever did land is still swept up by the catch
       job.uploadedPaths.push(path);
+      const publicUrl = await s3Upload(BUCKET, path, job.file);
       job.upDone=1; upqSync();
       var artPageUrls = [];
       for(var ai=0; ai<job.pageFiles.length; ai++){
         var af = job.pageFiles[ai];
         var aext = safeSlug(af.name.split('.').pop(), 8) || 'jpg';
         var apath = 'artworks/'+currentUser.id+'/'+uniq+'_i'+ai+'.'+aext;
-        var aUrl = await s3Upload(BUCKET, apath, af);
         job.uploadedPaths.push(apath);
+        var aUrl = await s3Upload(BUCKET, apath, af);
         artPageUrls.push(aUrl);
         job.upDone = 1+ai+1; upqSync();
       }
@@ -100,6 +106,8 @@
       var _mature = !!x.declared_mature;
 
       if(job.publishAt){
+          // Kept with the schedule so cancelling it can take the extra images back out of storage
+        if(job.uploadedPaths.length > 1) x.page_paths = job.uploadedPaths.slice(1);
         const{error:se}=await sb.from('scheduled_uploads').insert({
           user_id:currentUser.id, publish_at:job.publishAt,
           name:job.name, description:job.desc||null, tags:job.tags, category:job.cats,
