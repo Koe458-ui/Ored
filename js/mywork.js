@@ -1315,11 +1315,18 @@ function hideCommentThumbnail(){
     if(p.username){
       cmuAct('View profile', function(){
         cmCloseMod('cmUserMod');
+        if(window.dzOpenTab && window.dzOpenTab('/profile/' + encodeURIComponent(p.username))) return;
         openProfileByUsername(p.username, true);
       });
     }
 
     if(!isSelf){
+      cmuAct('Message', function(){
+        cmCloseMod('cmUserMod');
+        if(!currentUser){ openAuthMod(); return; }
+        if(window.dzOpenTab && window.dzOpenTab('/community?dm=' + encodeURIComponent(String(p.id)))) return;
+        if(typeof window.dmOpenWith === 'function') window.dmOpenWith(p.id);
+      });
       cmuAct('Report ' + (p.username ? '@' + p.username : 'this member'), function(){
         cmCloseMod('cmUserMod');
         if(!currentUser){ openAuthMod(); return; }
@@ -1523,6 +1530,27 @@ function hideCommentThumbnail(){
     return '<div class="' + cls + '"' + uid + '>' + esc(c.initial) + '</div>';
   }
 
+  function cpShowcaseLight(shot, name){
+    if(typeof dzLightOpen === 'function') dzLightOpen(shot, name + '\u2019s artwork');
+  }
+  function cpOpenShowcaseArt(url, shot, name){
+    var art = (typeof images !== 'undefined' && Array.isArray(images))
+      ? images.filter(function(a){ return a && a.image_url === url; })[0] : null;
+    if(art && art.id){
+      if(window.dzOpenTab && window.dzOpenTab('/artwork/' + encodeURIComponent(String(art.id)))) return;
+      cpShowcaseLight(shot, name);
+      return;
+    }
+    var find = (url && sb)
+      ? sb.from('artworks').select('id').eq('image_url', url).eq('status', 'approved')
+          .eq('visibility', 'published').limit(1).maybeSingle()
+          .then(function(r){ return (r && r.data && r.data.id) ? '/artwork/' + encodeURIComponent(String(r.data.id)) : null; })
+      : Promise.resolve(null);
+    var opened = window.dzOpenTabWhen ? window.dzOpenTabWhen(find) : null;
+    if(!opened){ cpShowcaseLight(shot, name); return; }
+    opened.then(function(ok){ if(!ok) cpShowcaseLight(shot, name); });
+  }
+
   function cpAuthorName(c){
     var a = c.user_id ? cpAuthors[String(c.user_id)] : null;
     return (a && a.name) ? a.name : c.user;
@@ -1597,7 +1625,7 @@ function hideCommentThumbnail(){
 
         var scImg = div.querySelector('.cpShowcaseImg');
         if(scImg && scShot) scImg.addEventListener('click', function(){
-          if(typeof dzLightOpen === 'function') dzLightOpen(scShot, scName + '\u2019s artwork');
+          cpOpenShowcaseArt(c.image_url, scShot, scName);
         });
       } else {
         if(!c.text){ return; }

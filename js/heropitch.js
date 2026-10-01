@@ -14,12 +14,8 @@
 
   function hpGo(){ go('artworks'); }
 
-    // /community has no `section`, so dzRoutePath cannot resolve it; open it the way the top nav does, route push as fallback
   function hpJoin(){
-    var open = typeof window.bnGoCommunity === 'function' ? window.bnGoCommunity : null;
-    if(open){ open(); return; }
-    if(typeof window.dzRouteGo === 'function' && window.dzRouteGo('/community')) return;
-    window.location.href = '/community';
+    if(typeof window.dzRouteTab === 'function') window.dzRouteTab('/community');
   }
 
   window.hpGo   = hpGo;

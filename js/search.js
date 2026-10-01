@@ -263,6 +263,7 @@
       openLB(row.image_url, row.name, cats[0]||'', row.description||'', String(row.id), false, rows);
       return;
     }
+    if(kind === 'marketplace' && window.dzCommissionTab && window.dzCommissionTab(row)) return;
     if(typeof window.dzOpenRow==='function') window.dzOpenRow(kind, row);
   }
 

@@ -157,7 +157,8 @@
     }catch(e){}
     fallback();
   };
-  window.dzOpenListing = async function(id){
+  window.dzOpenListing = async function(id, type){
+    if(window.dzCommissionTab && window.dzCommissionTab({ id:id, item_type:type })) return;
     if(!sb) return;
     try{
       var sel = (typeof window.dzSelectFor === 'function')
@@ -194,13 +195,13 @@
         }
       }
       if(itm.length){
-        var m = await sb.from('marketplace_items').select('id,title,preview_url')
+        var m = await sb.from('marketplace_items').select('id,title,preview_url,item_type')
                   .in('id', itm).eq('status','approved').eq('visibility','published').limit(10);
         var mrows = (m && m.data) || [];
         if(mrows.length){
           out += '<div><div class="avBlockH">Related listings</div><div class="dzvRelRow">'+
             mrows.map(function(x){
-              return '<div class="dzvRelCard" onclick="dzOpenListing(\''+esc(x.id)+'\')">'+
+              return '<div class="dzvRelCard" onclick="dzOpenListing(\''+esc(x.id)+'\',\''+esc(x.item_type||'')+'\')">'+
                 (x.preview_url ? '<img src="'+esc(getThumbnailUrl(x.preview_url))+'" alt="" loading="lazy">'
                                : '<span class="dzvRelNo"></span>')+
                 '<span class="dzvRelNm">'+esc(x.title||'Untitled')+'</span></div>';
@@ -439,6 +440,8 @@
   window.dzVwProfile = function(id){
     var p = vwWho[id];
     if(!p || !p.username){ if(typeof showToast==='function') showToast('Profile not found'); return; }
+    var away = id === 'avCard' || (id === 'dzvCard' && cur.sec === 'marketplace');
+    if(away && window.dzOpenTab && window.dzOpenTab('/profile/' + encodeURIComponent(p.username))) return;
     openProfileByUsername(p.username);
   };
 

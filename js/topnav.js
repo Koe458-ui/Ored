@@ -53,7 +53,7 @@
       fallback:'artworks',
       pick: function (sec, e) {
         var path = (typeof window.dzRoutePath === 'function') ? window.dzRoutePath(sec) : null;
-        if (path && typeof window.dzRouteGo === 'function' && window.dzRouteGo(path)) {
+        if (path && typeof window.dzRouteTab === 'function' && window.dzRouteTab(path)) {
           if (e) e.preventDefault();
           return;
         }
@@ -78,7 +78,7 @@
           if (typeof window.bnGoFriends === 'function') window.bnGoFriends();
           return;
         }
-        if (typeof window.dzRouteGo === 'function' && window.dzRouteGo('/community')) {
+        if (typeof window.dzRouteTab === 'function' && window.dzRouteTab('/community')) {
           if (e) e.preventDefault();
           return;
         }

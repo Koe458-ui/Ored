@@ -289,7 +289,7 @@
         ? '<img loading="lazy" decoding="async" '+dzThumbAttrs(r.preview_url)+' alt="'+esc(r.title)+'">'
         : '<span class="dzExt">'+esc((r.item_type||'ITEM').toUpperCase())+'</span>';
       var hasFile = r.file_ext ? 1 : 0;
-      return '<div class="dzCard" data-id="'+id+'" onclick="dzOpenView(\'marketplace\',\''+id+'\')">'+
+      return '<div class="dzCard" data-id="'+id+'" onclick="dzOpenMarket(\''+id+'\')">'+
         '<div class="dzThumb">'+mt+'<span class="dzBadge">'+esc((r.item_type||'').toUpperCase())+'</span></div>'+
         '<div class="dzBody"><div class="dzName">'+esc(r.title)+'</div>'+
         (r.summary ? '<div class="dzHint">'+esc(r.summary)+'</div>' : '')+
@@ -2985,6 +2985,11 @@
   window.dzSchClear      = dzSchClear;
   window.dzSchDone       = dzSchDone;
   window.dzGetRows = function(sec){ return dzSecRows[sec] || []; };
+  window.dzOpenMarket = function(id){
+    var row = (dzSecRows.marketplace || []).filter(function(x){ return String(x.id) === String(id); })[0];
+    if(window.dzCommissionTab && window.dzCommissionTab(row)) return;
+    dzOpenView('marketplace', id);
+  };
   window.dzSecReset = function(sec){
     if(sec){ delete dzSecRows[sec]; dzLoaded[sec] = false; dzBusy[sec] = false; }
     var host = sec && document.getElementById('fgSecC-'+sec);

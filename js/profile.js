@@ -561,6 +561,7 @@
   function pfDzOpen(sec, id){
     var arr = sec==='resources' ? (pf.resRows||[]) : sec==='blog' ? (pf.blogRows||[]) : (pf.mktRows||[]);
     var row = arr.find(function(x){ return String(x.id)===String(id); });
+    if(sec === 'marketplace' && window.dzCommissionTab && window.dzCommissionTab(row)) return;
     if(row && typeof window.dzOpenRow==='function') window.dzOpenRow(sec, row);
   }
 

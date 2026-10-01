@@ -536,8 +536,10 @@
   }
   window.dzPaintLimits = dzPaintLimits;
 
+  var dzDomLoaded = document.readyState === 'complete';
+  document.addEventListener('DOMContentLoaded', function(){ dzDomLoaded = true; }, { once:true });
   function dzDomReady(){
-    if(document.readyState !== 'loading') return Promise.resolve();
+    if(dzDomLoaded) return Promise.resolve();
     return new Promise(function(res){
       document.addEventListener('DOMContentLoaded', function(){ res(); }, { once:true });
     });
@@ -1169,6 +1171,41 @@
   var _dzArtistWanted = {};
   var _dzArtistFlight = {};
   var _dzArtistTimer  = null;
+
+  function dzOpenTab(path){
+    if(!path) return false;
+    var name = 'oredlab:' + path;
+    if(window.name === name) return false;
+    var w = null;
+    try{ w = window.open('', name); }catch(e){ w = null; }
+    if(!w) return false;
+    var at = null;
+    try{ at = w.location.pathname + w.location.search; }catch(e){ at = null; }
+    if(at !== path){
+      try{ w.location.href = path; }catch(e){ try{ w.close(); }catch(e2){} return false; }
+    }
+    try{ w.focus(); }catch(e){}
+    return true;
+  }
+  window.dzOpenTab = dzOpenTab;
+
+  function dzOpenTabWhen(find){
+    var w = null;
+    try{ w = window.open('', '_blank'); }catch(e){ w = null; }
+    if(!w) return null;
+    return Promise.resolve(find).then(function(path){
+      if(!path){ w.close(); return false; }
+      try{ w.name = 'oredlab:' + path; w.location.href = path; }catch(e){ w.close(); return false; }
+      return true;
+    }, function(){ w.close(); return false; });
+  }
+  window.dzOpenTabWhen = dzOpenTabWhen;
+
+  function dzCommissionTab(row){
+    return !!(row && row.id && row.item_type === 'commission' &&
+              dzOpenTab('/listing/' + encodeURIComponent(String(row.id))));
+  }
+  window.dzCommissionTab = dzCommissionTab;
 
   function dzBuildHoverReveal(uid){
     var frag = document.createDocumentFragment();

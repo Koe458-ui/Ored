@@ -272,18 +272,24 @@
     else if(avWide.addListener) avWide.addListener(onAvWide);
   }
 
+  function avStill(art){
+    return !art || !avCurrentArt || String(avCurrentArt.id) === String(art.id);
+  }
   function avRenderCard(art){
     avPlaceCard();
     var host = avHost('avAuthorCard');
     if(!host || typeof window.dzVwCard !== 'function') return;
-    host.innerHTML = window.dzVwCard('avCard', 'closeLB()');
-    if(typeof window.dzVwFill === 'function') window.dzVwFill('avCard', art && art.user_id);
+    Promise.resolve(window.dzVwCard('avCard', 'closeLB()')).then(function(html){
+      if(typeof html !== 'string' || !avStill(art)) return;
+      host.innerHTML = html;
+      if(typeof window.dzVwFill === 'function') window.dzVwFill('avCard', art && art.user_id);
+    });
   }
   function avRenderRail(art){
     var host = avHost('avActRail', 'avAuthorCard');
     if(!host || typeof window.dzVwActRow !== 'function') return;
     var id = art && art.id ? String(art.id) : '';
-    host.innerHTML = window.dzVwActRow([
+    Promise.resolve(window.dzVwActRow([
       { k:'like', c:'red',   cls:'engLike', press:1, label:'Like',
         attrs:' data-id="'+esc(id)+'"', on:'' },
       { k:'bm',   c:'amber', cls:'engBm',   press:1, label:'Bookmark',
@@ -291,8 +297,11 @@
       { k:'dl',    c:'green', label:'Download', on:'avDownload()' },
       { k:'share', c:'blue',  label:'Share',    on:'avShare()' },
       { k:'report',c:'red',   label:'Report artwork', on:'avReport()' }
-    ]);
-    if(typeof window.dzRepaintEng === 'function') window.dzRepaintEng();
+    ])).then(function(html){
+      if(typeof html !== 'string' || !avStill(art)) return;
+      host.innerHTML = html;
+      if(typeof window.dzRepaintEng === 'function') window.dzRepaintEng();
+    });
   }
 
   function avSetupNav(id, navSource){
