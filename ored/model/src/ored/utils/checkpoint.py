@@ -309,7 +309,9 @@ def check_compatible(
     if tokenizer is not None and recorded_tokenizer is not None and recorded_tokenizer != tokenizer:
         problems.append(
             "Tokenizer mismatch: the checkpoint was trained with a different vocabulary "
-            f"({len(recorded_tokenizer.get('itos', []))} tokens vs {len(tokenizer.get('itos', []))})"
+            f"({recorded_tokenizer.get('name')}, {len(recorded_tokenizer.get('itos', []))} tokens vs "
+            f"{tokenizer.get('name')}, {len(tokenizer.get('itos', []))}). Train a new model, or keep "
+            f"this one with --set data.tokenizer={recorded_tokenizer.get('name')}"
         )
 
     if problems:

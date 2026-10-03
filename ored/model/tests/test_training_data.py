@@ -267,17 +267,29 @@ def test_snapshot_round_trips_through_storage(store, cfg, tmp_path):
     assert (landed.directory / "train.txt").read_bytes() == (snapshot.directory / "train.txt").read_bytes()
 
 
-def test_character_model_loads_the_snapshot(store, cfg):
+def test_subword_model_loads_the_snapshot(store, cfg):
     prepared = prepare_dataset(cfg, store)
     assert cfg.data.supabase.snapshot == prepared.snapshot.sha256
     datasets, tokenizer = build_text_datasets(cfg)
-    assert tokenizer.name == "char"
+    assert tokenizer.name == "subword"
     assert len(tokenizer.itos) == prepared.snapshot.manifest["tokenizer"]["vocab_size"]
     train_text = (prepared.snapshot.directory / "train.txt").read_text(encoding="utf-8")
-    assert set(tokenizer.itos[1:]) == set(train_text)
+    assert tokenizer.decode(tokenizer.encode(train_text)) == train_text
     assert all(len(datasets[s]) > 0 for s in ("train", "val", "test"))
     again = prepare_dataset(cfg, store)
     assert again.dataset.id == prepared.dataset.id and again.dataset.version == 1
+
+
+def test_snapshot_taken_with_another_tokenizer_still_trains(store, cfg):
+    from ored.training.tasks import LanguageModelTask
+
+    cfg.data.tokenizer = "char"
+    prepare_dataset(cfg, store)
+    cfg.data.tokenizer = "subword"
+    task = LanguageModelTask(cfg)
+    task.build_data()
+    assert task.dataset["tokenizer"]["name"] == "subword"
+    assert task.dataset["tokenizer"]["vocab_size"] == task.tokenizer.vocab_size
 
 
 def test_register_versions_by_content(store, cfg):

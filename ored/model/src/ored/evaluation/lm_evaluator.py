@@ -81,7 +81,7 @@ def measure_splits(model, cfg: Config, device: torch.device,
         results[split] = {
             "tokens": float(total_tokens),
             "loss": mean_loss,
-            "bpc": mean_loss / math.log(2),
+            "bpc": mean_loss / math.log(2) / dataset.chars_per_token,
             "perplexity": math.exp(min(mean_loss, 20.0)),
         }
     return results
@@ -136,7 +136,7 @@ def evaluate_language_model(
                     f"{r['bpc']:>12.4f}{r['perplexity']:>13.3f}")
     logger.info("")
     logger.info("bits/char = how many yes/no questions are needed, on average, to")
-    logger.info(f"            identify the next character. {math.log2(tokenizer.vocab_size):.2f} = knows nothing.")
+    logger.info("            identify each character of the text. Lower is better.")
 
     grammar = load_grammar(cfg.data.corpus.dir)
     logger.info(section("GENERATED TEXT"))

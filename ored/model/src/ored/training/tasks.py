@@ -112,6 +112,7 @@ class LanguageModelTask(Task):
         super().__init__(cfg)
         self.criterion = nn.CrossEntropyLoss()
         self.tokenizer = None
+        self.chars_per_token = 1.0
         self.dataset: Dict[str, Any] = {}
 
     def build_data(self, generator=None):
@@ -119,6 +120,7 @@ class LanguageModelTask(Task):
 
         loaders, datasets, tokenizer = build_text_dataloaders(self.cfg, generator=generator)
         self.tokenizer = tokenizer
+        self.chars_per_token = datasets["train"].chars_per_token
         if self.cfg.data.source == "supabase":
             self.dataset = self._snapshot_summary(tokenizer)
         else:
@@ -131,11 +133,19 @@ class LanguageModelTask(Task):
 
         snapshot = load_snapshot(self.cfg, verify=False)
         built = tokenizer_digest(tokenizer.to_dict())
-        if built != snapshot.manifest["tokenizer"]["sha256"]:
+        recorded = snapshot.manifest["tokenizer"]
+        intended = snapshot.manifest.get("intended") or {}
+        same_settings = recorded["name"] == self.cfg.data.tokenizer.lower() and (
+            recorded["name"] == "char" or intended.get("vocab_size") == self.cfg.data.vocab_size)
+        summary = snapshot.summary()
+        if not same_settings:
+            summary["tokenizer"] = {"name": tokenizer.name, "vocab_size": tokenizer.vocab_size,
+                                    "sha256": built}
+        elif built != recorded["sha256"]:
             raise SnapshotError(
                 f"the tokenizer built from snapshot {snapshot.sha256[:16]} ({built[:16]}) differs from the "
-                f"one its manifest records ({snapshot.manifest['tokenizer']['sha256'][:16]})")
-        return snapshot.summary()
+                f"one its manifest records ({recorded['sha256'][:16]})")
+        return summary
 
     def build_model(self) -> nn.Module:
         if self.tokenizer is None:
@@ -155,7 +165,7 @@ class LanguageModelTask(Task):
 
         loss_value = loss.item()
         metrics = {
-            "bpc": loss_value / math.log(2),
+            "bpc": loss_value / math.log(2) / self.chars_per_token,
             "ppl": math.exp(min(loss_value, 20.0)),
         }
         return loss, metrics, B

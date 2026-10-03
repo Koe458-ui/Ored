@@ -5,7 +5,8 @@ deterministic: true
 
 data:
   source: supabase
-  tokenizer: char
+  tokenizer: subword
+  vocab_size: 1024
   block_size: 512
   stride: 256
   batch_size: 32

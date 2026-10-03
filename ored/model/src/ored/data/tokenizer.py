@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Sequence, Type
+from typing import Any, Callable, Dict, Iterable, List, Sequence, Tuple, Type
 
 UNK_TOKEN = "<unk>"
 
@@ -37,6 +39,9 @@ class Tokenizer:
 
     def to_dict(self) -> Dict[str, Any]:
         raise NotImplementedError
+
+    def is_known(self, token_id: int) -> bool:
+        return int(token_id) != 0
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Tokenizer":
@@ -73,7 +78,7 @@ class CharTokenizer(Tokenizer):
         self.stoi: Dict[str, int] = {s: i for i, s in enumerate(self.itos)}
 
     @classmethod
-    def from_text(cls, text: str) -> "CharTokenizer":
+    def from_text(cls, text: str, **_: Any) -> "CharTokenizer":
         return cls(text)
 
     @property
@@ -111,8 +116,176 @@ class CharTokenizer(Tokenizer):
         return f"CharTokenizer | vocab_size={self.vocab_size} | symbols: {visible!r} + newline"
 
 
-def build_tokenizer(name: str, text: str) -> Tokenizer:
+PRETOKEN_RE = re.compile(
+    r"'(?i:[sdmt]|ll|ve|re)"
+    r"|[^\r\n\w]?[^\W\d_]+"
+    r"|_+"
+    r"|\d"
+    r"| ?[^\s\w]+[\r\n]*"
+    r"|\s*[\r\n]+"
+    r"|\s+(?!\S)"
+    r"|\s+"
+)
+DEFAULT_SUBWORD_VOCAB = 1024
+
+
+def pretokenize(text: str) -> List[str]:
+    return PRETOKEN_RE.findall(text)
+
+
+def _bytes_to_unicode() -> Dict[int, str]:
+    printable = (list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1))
+                 + list(range(ord("®"), ord("ÿ") + 1)))
+    table = {b: chr(b) for b in printable}
+    extra = 0
+    for b in range(256):
+        if b not in table:
+            table[b] = chr(256 + extra)
+            extra += 1
+    return table
+
+
+BYTE_TO_CHAR: Dict[int, str] = _bytes_to_unicode()
+CHAR_TO_BYTE: Dict[str, int] = {c: b for b, c in BYTE_TO_CHAR.items()}
+BASE_TOKENS: List[str] = [BYTE_TO_CHAR[b] for b in range(256)]
+
+
+def _to_symbols(word: str) -> str:
+    return "".join(BYTE_TO_CHAR[b] for b in word.encode("utf-8"))
+
+
+@register_tokenizer("subword")
+class SubwordTokenizer(Tokenizer):
+    def __init__(self, merges: Sequence[Tuple[str, str]] = (), seen_bytes: Iterable[int] = range(256)) -> None:
+        self.seen_bytes: List[int] = sorted(set(int(b) for b in seen_bytes))
+        self._seen = set(self.seen_bytes)
+        self.merges: List[Tuple[str, str]] = [(a, b) for a, b in merges]
+        self.itos: List[str] = BASE_TOKENS + [a + b for a, b in self.merges]
+        self.stoi: Dict[str, int] = {}
+        for i, token in enumerate(self.itos):
+            self.stoi.setdefault(token, i)
+        self.ranks: Dict[Tuple[str, str], int] = {pair: i for i, pair in enumerate(self.merges)}
+        self._cache: Dict[str, List[int]] = {}
+
+    @classmethod
+    def from_text(cls, text: str, vocab_size: int = DEFAULT_SUBWORD_VOCAB, **_: Any) -> "SubwordTokenizer":
+        if vocab_size < len(BASE_TOKENS):
+            raise ValueError(f"a byte-level tokenizer needs vocab_size >= {len(BASE_TOKENS)}, "
+                             f"got {vocab_size}")
+        words = Counter(_to_symbols(w) for w in pretokenize(text))
+        seen = set(text.encode("utf-8")) | {ord("\n")}
+        return cls(learn_merges(words, vocab_size - len(BASE_TOKENS)), seen)
+
+    @property
+    def vocab_size(self) -> int:
+        return len(self.itos)
+
+    @property
+    def alphabet(self) -> List[str]:
+        return [chr(b) for b in self.seen_bytes if b < 128]
+
+    def is_known(self, token_id: int) -> bool:
+        token_id = int(token_id)
+        return token_id >= len(BASE_TOKENS) or token_id in self._seen
+
+    def _encode_word(self, word: str) -> List[int]:
+        cached = self._cache.get(word)
+        if cached is not None:
+            return cached
+        pieces = list(_to_symbols(word))
+        while len(pieces) > 1:
+            best = None
+            for i in range(len(pieces) - 1):
+                rank = self.ranks.get((pieces[i], pieces[i + 1]))
+                if rank is not None and (best is None or rank < best[0]):
+                    best = (rank, i)
+            if best is None:
+                break
+            i = best[1]
+            pieces[i:i + 2] = [pieces[i] + pieces[i + 1]]
+        ids = [self.stoi[p] for p in pieces]
+        if len(self._cache) < 100_000:
+            self._cache[word] = ids
+        return ids
+
+    def encode(self, text: str) -> List[int]:
+        ids: List[int] = []
+        for word in pretokenize(text):
+            ids.extend(self._encode_word(word))
+        return ids
+
+    def token_bytes(self, index: int) -> bytes:
+        if not 0 <= index < len(self.itos):
+            raise ValueError(
+                f"token id {index} is outside this tokenizer's vocabulary "
+                f"(0..{len(self.itos) - 1})"
+            )
+        return bytes(CHAR_TO_BYTE[c] for c in self.itos[index])
+
+    def decode(self, ids: Sequence[int]) -> str:
+        data = b"".join(self.token_bytes(int(i)) for i in ids)
+        return data.decode("utf-8", errors="replace")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"name": "subword", "kind": "byte_bpe", "itos": self.itos,
+                "merges": [list(m) for m in self.merges], "seen_bytes": self.seen_bytes}
+
+    @classmethod
+    def _from_dict(cls, data: Dict[str, Any]) -> "SubwordTokenizer":
+        tokenizer = cls([tuple(m) for m in data["merges"]], data.get("seen_bytes", range(256)))
+        if tokenizer.itos != list(data["itos"]):
+            raise ValueError("subword tokenizer's itos does not match its merges")
+        return tokenizer
+
+    def describe(self) -> str:
+        longest = sorted((self.decode([i]) for i in range(len(BASE_TOKENS), self.vocab_size)),
+                         key=len, reverse=True)[:5]
+        return (f"SubwordTokenizer (byte-level BPE) | vocab_size={self.vocab_size} | 256 bytes "
+                f"+ {len(self.merges)} merges | longest pieces: {longest!r}")
+
+
+def learn_merges(words: Counter, n_merges: int) -> List[Tuple[str, str]]:
+    vocab: List[List[str]] = [list(w) for w in sorted(words)]
+    counts: List[int] = [words[w] for w in sorted(words)]
+    pairs: Counter = Counter()
+    where: Dict[Tuple[str, str], set] = defaultdict(set)
+    for i, pieces in enumerate(vocab):
+        for pair in zip(pieces, pieces[1:]):
+            pairs[pair] += counts[i]
+            where[pair].add(i)
+
+    merges: List[Tuple[str, str]] = []
+    while len(merges) < n_merges and pairs:
+        best = min(pairs.items(), key=lambda kv: (-kv[1], kv[0]))
+        if best[1] < 2:
+            break
+        a, b = pair = best[0]
+        merges.append(pair)
+        for i in sorted(where.pop(pair, ())):
+            pieces, n = vocab[i], counts[i]
+            for old in zip(pieces, pieces[1:]):
+                pairs[old] -= n
+                if pairs[old] <= 0:
+                    del pairs[old]
+            merged: List[str] = []
+            j = 0
+            while j < len(pieces):
+                if j + 1 < len(pieces) and pieces[j] == a and pieces[j + 1] == b:
+                    merged.append(a + b)
+                    j += 2
+                else:
+                    merged.append(pieces[j])
+                    j += 1
+            vocab[i] = merged
+            for new in zip(merged, merged[1:]):
+                pairs[new] += n
+                where[new].add(i)
+        pairs.pop(pair, None)
+    return merges
+
+
+def build_tokenizer(name: str, text: str, **options: Any) -> Tokenizer:
     key = name.lower()
     if key not in TOKENIZER_REGISTRY:
         raise ValueError(f"unknown tokenizer {name!r}; have {sorted(TOKENIZER_REGISTRY)}")
-    return TOKENIZER_REGISTRY[key].from_text(text)
+    return TOKENIZER_REGISTRY[key].from_text(text, **options)

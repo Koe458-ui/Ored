@@ -482,7 +482,7 @@ Ored.ai/
 │   │   ├── dataset.py          # Dataset + DataLoader (batching)
 │   │   ├── corpus.py           # text corpus, disjoint operand splits
 │   │   ├── facts.py            # question-and-answer lines mixed into the corpus
-│   │   ├── tokenizer.py        # char tokenizer + registry
+│   │   ├── tokenizer.py        # char + byte-level BPE tokenizers + registry
 │   │   └── text_dataset.py     # sequence windows, shift-by-one targets
 │   ├── models/
 │   │   ├── base.py             # the interface every model implements
@@ -1112,6 +1112,7 @@ solved in one forward pass.
 |---|---|
 | Corpus generator with disjoint operand splits | ✅ |
 | Character tokenizer, registry, exact round-trip, saved in checkpoints | ✅ |
+| Byte-level BPE tokenizer, as in GPT-2/GPT-4/Llama 3 — the default (`data.tokenizer: subword`, `data.vocab_size`) | ✅ |
 | Sequence dataset with shift-by-one targets, stride windows | ✅ |
 | Decoder-only Transformer written from scratch | ✅ |
 | Causal masking, verified numerically | ✅ |
@@ -1132,12 +1133,11 @@ solved in one forward pass.
 1. **Finish the arithmetic.** The best measured configuration reaches 84.3%
    held out across three seeds. H4 was ruled out as a contributor; H2 is the
    part that has not been isolated at a long epoch budget.
-2. **Subword tokenization (BPE)** — the tokenizer interface is ready for it.
-3. **Real text** — a larger corpus that does not fit in memory, streaming, and
+2. **Real text** — a larger corpus that does not fit in memory, streaming, and
    caching in `data/processed/`.
-4. **Evaluation during training** — sample and score every N epochs, so quality
+3. **Evaluation during training** — sample and score every N epochs, so quality
    is visible on the loss curve rather than only at the end.
-5. **Efficiency** — gradient accumulation, mixed precision, `torch.compile`.
+4. **Efficiency** — gradient accumulation, mixed precision, `torch.compile`.
 6. **KV caching for generation** — right now every new token re-runs the whole
    context, which is O(n²) work for O(n) output.
 

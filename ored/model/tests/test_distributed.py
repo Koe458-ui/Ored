@@ -566,7 +566,10 @@ def test_the_language_model_trains_distributed(tiny_corpus, tmp_path):
     run_workers(train_worker, 2, dist_cfg(tiny_corpus, tmp_path / "ck", epochs=1), tmp_path, {})
     ranks = results(tmp_path, 2)
     record = ranks[0]["history"][0]
-    assert record["val_bpc"] == pytest.approx(record["val_loss"] / math.log(2))
+    from ored.data.text_dataset import build_text_datasets
+
+    chars_per_token = build_text_datasets(tiny_corpus)[0]["train"].chars_per_token
+    assert record["val_bpc"] == pytest.approx(record["val_loss"] / math.log(2) / chars_per_token)
     assert record["val_ppl"] == pytest.approx(math.exp(record["val_loss"]))
     assert record["val_tokens"] == record["val_examples"] * tiny_corpus.data.block_size
     assert same_weights(ranks[0]["params"], ranks[1]["params"])

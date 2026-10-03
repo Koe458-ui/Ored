@@ -58,3 +58,13 @@ def test_text_settings_stay_text_when_they_look_like_numbers():
     assert cfg.data.supabase.dataset_tag == "2024" and cfg.run_name == "007"
     assert cfg.data.supabase.snapshot == "1e5" + "0" * 61
     assert cfg.training.epochs == 3 and cfg.training.learning_rate == 1e-4 and cfg.data.shuffle_train is False
+
+
+def test_subword_vocab_must_hold_every_byte():
+    from ored.config import Config
+
+    cfg = Config()
+    cfg.data.tokenizer = "subword"
+    cfg.data.vocab_size = 100
+    with pytest.raises(ValueError, match="vocab_size must be >= 256"):
+        cfg.data.validate()
