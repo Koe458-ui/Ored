@@ -103,7 +103,9 @@ class DataConfig:
 
     block_size: int = 128
 
-    tokenizer: str = "char"
+    tokenizer: str = "subword"
+
+    vocab_size: int = 1024
 
     stride: int = 64
 
@@ -126,6 +128,8 @@ class DataConfig:
             raise ValueError("data.block_size must be >= 2")
         if self.stride < 1:
             raise ValueError("data.stride must be >= 1")
+        if self.vocab_size < 2:
+            raise ValueError("data.vocab_size must be >= 2")
         self.split.validate()
         self.corpus.validate()
 

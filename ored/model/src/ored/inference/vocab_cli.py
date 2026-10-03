@@ -67,7 +67,7 @@ def inspect(
 
         min_known_ratio = OnlinePolicy().min_known_ratio
     ids = tokenizer.encode(text)
-    unknown = sorted({c for c, i in zip(text, ids) if i == UNK_ID})
+    unknown = sorted({c for c in set(text) if UNK_ID in tokenizer.encode(c)})
     ratio = sum(1 for i in ids if i != UNK_ID) / len(ids) if ids else 0.0
 
     unseen = None
@@ -76,7 +76,7 @@ def inspect(
             word for word in WORD_RE.findall(text) if word.lower() not in known_words
         })
 
-    symbols = "".join(s for s in tokenizer.itos[1:] if s != "\n")
+    symbols = "".join(s for s in getattr(tokenizer, "alphabet", tokenizer.itos[1:]) if s != "\n")
     return VocabReport(
         text=text,
         vocab_size=tokenizer.vocab_size,

@@ -68,7 +68,8 @@ def test_corpus_arithmetic_is_correct(tiny_corpus):
 def test_tokenizer_is_fitted_on_training_text_only(tiny_corpus):
     datasets, tokenizer = build_text_datasets(tiny_corpus)
     train_text = read_corpus(tiny_corpus.data.corpus.dir, "train")
-    assert set(tokenizer.itos[1:]) == set(train_text)
+    assert set(tokenizer.alphabet) == set(train_text)
+    assert len(tokenizer.encode(train_text)) < len(train_text)
 
 
 def test_dataloaders_produce_correct_batch_shapes(tiny_corpus):

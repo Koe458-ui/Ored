@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from ored.data.tokenizer import UNK_TOKEN, CharTokenizer, Tokenizer, build_tokenizer
+from ored.data.tokenizer import (UNK_TOKEN, CharTokenizer, SubwordTokenizer, Tokenizer,
+                                 build_tokenizer, pretokenize)
 
 
 @pytest.fixture()
@@ -61,3 +62,50 @@ def test_dict_round_trip(tokenizer):
 def test_build_tokenizer_rejects_unknown_name():
     with pytest.raises(ValueError, match="unknown tokenizer"):
         build_tokenizer("bpe_that_does_not_exist_yet", "text")
+
+
+SUBWORD_TEXT = "the cat sees the cats .\nthe cat sat on 13 + 8 = 21 .\nWhat is velocity?\n" * 10
+
+
+@pytest.fixture()
+def subword():
+    return build_tokenizer("subword", SUBWORD_TEXT, vocab_size=80)
+
+
+def test_subword_round_trip_is_exact(subword):
+    for text in [SUBWORD_TEXT, "the cat", "\n", "13 + 8 = 21", "  the   cat  "]:
+        assert subword.decode(subword.encode(text)) == text
+
+
+def test_subword_pieces_are_longer_than_characters(subword):
+    assert len(subword.encode(SUBWORD_TEXT)) < len(SUBWORD_TEXT) / 2
+    assert subword.vocab_size <= 80
+    assert any(len(piece) > 1 for piece in subword.itos[1:])
+
+
+def test_subword_keeps_newline_and_digits_as_single_tokens(subword):
+    assert subword.encode("\n") == [subword.stoi["\n"]]
+    assert [subword.decode([i]) for i in subword.encode("21")] == ["2", "1"]
+
+
+def test_subword_unknown_characters_are_id_zero(subword):
+    assert subword.itos[0] == UNK_TOKEN
+    assert subword.decode(subword.encode("the Z cat")) == "the  cat"
+
+
+def test_subword_is_deterministic():
+    a = build_tokenizer("subword", SUBWORD_TEXT, vocab_size=60)
+    b = build_tokenizer("subword", SUBWORD_TEXT, vocab_size=60)
+    assert a.to_dict() == b.to_dict()
+
+
+def test_subword_dict_round_trip(subword, tmp_path):
+    reloaded = Tokenizer.load(subword.save(tmp_path / "tok.json"))
+    assert isinstance(reloaded, SubwordTokenizer)
+    assert reloaded.itos == subword.itos
+    assert reloaded.encode(SUBWORD_TEXT) == subword.encode(SUBWORD_TEXT)
+
+
+def test_pretokenize_covers_every_character():
+    text = "héllo  wörld__x\t\ty! 3.14\n\n¿qué?"
+    assert "".join(pretokenize(text)) == text

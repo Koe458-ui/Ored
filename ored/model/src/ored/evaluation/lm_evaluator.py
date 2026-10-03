@@ -136,7 +136,7 @@ def evaluate_language_model(
                     f"{r['bpc']:>12.4f}{r['perplexity']:>13.3f}")
     logger.info("")
     logger.info("bits/char = how many yes/no questions are needed, on average, to")
-    logger.info(f"            identify the next character. {math.log2(tokenizer.vocab_size):.2f} = knows nothing.")
+    logger.info(f"            identify the next token. {math.log2(tokenizer.vocab_size):.2f} = knows nothing.")
 
     grammar = load_grammar(cfg.data.corpus.dir)
     logger.info(section("GENERATED TEXT"))

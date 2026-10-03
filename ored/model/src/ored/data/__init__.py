@@ -9,7 +9,7 @@ from ored.data.preprocessing import (
     int_to_bits,
 )
 from ored.data.text_dataset import TextDataset, build_text_dataloaders, build_text_datasets
-from ored.data.tokenizer import CharTokenizer, Tokenizer, build_tokenizer
+from ored.data.tokenizer import CharTokenizer, SubwordTokenizer, Tokenizer, build_tokenizer
 
 __all__ = [
     "BitAdditionDataset",
@@ -33,5 +33,6 @@ __all__ = [
     "build_text_dataloaders",
     "Tokenizer",
     "CharTokenizer",
+    "SubwordTokenizer",
     "build_tokenizer",
 ]

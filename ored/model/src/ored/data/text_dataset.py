@@ -55,7 +55,7 @@ def build_text_datasets(cfg: Config) -> Tuple[Dict[str, TextDataset], Tokenizer]
     directory = corpus_directory(cfg)
     texts = {split: read_corpus(directory, split) for split in SPLITS}
 
-    tokenizer = build_tokenizer(cfg.data.tokenizer, texts["train"])
+    tokenizer = build_tokenizer(cfg.data.tokenizer, texts["train"], vocab_size=cfg.data.vocab_size)
 
     datasets: Dict[str, TextDataset] = {}
     for split in SPLITS:

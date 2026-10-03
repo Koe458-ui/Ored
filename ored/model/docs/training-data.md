@@ -20,7 +20,7 @@ ored_datasets row  (name = tag, version 1, 2, 3 …, sha256, counts, selection)
       ▼
 ored_training_sessions row (queued → running → evaluated / failed / cancelled, dataset_id)
       ▼
-char tokenizer from train.txt ──► existing Trainer ──► base / best / live / history checkpoints
+subword tokenizer from train.txt ──► existing Trainer ──► base / best / live / history checkpoints
       ▼                                              (each payload carries extra.dataset)
 ored_checkpoints rows (session_id) ──► ored_model_versions (candidate, never production)
 ```
@@ -211,8 +211,12 @@ refuses a damaged folder. `data/snapshots/` is ignored by Git.
 (`data.supabase.on_invalid: skip`) leaves them out instead and lists them in the
 manifest.
 
-**Tokenizer.** Unchanged: the character tokenizer is built from `train.txt`
-exactly as it is built from the generated corpus. Its sha256 is written into the
+**Tokenizer.** The subword (BPE) tokenizer is learned from `train.txt`
+exactly as it is learned from the generated corpus: every character of the
+training text is a token, and the most frequent adjacent pairs inside a word are
+merged until the vocabulary reaches `data.vocab_size` (default 1024). Digits and
+newlines stay single tokens. `data.tokenizer: char` still selects the
+character tokenizer. Its sha256 is written into the
 manifest when the snapshot is taken and checked again when training builds it.
 
 ## Versions: `ored_datasets`

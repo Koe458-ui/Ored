@@ -14,7 +14,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from ored.config import Config
 from ored.data.corpus import SPLITS
-from ored.data.tokenizer import CharTokenizer
+from ored.data.tokenizer import build_tokenizer
 from ored.data.training_data import (
     ALL_TAGS,
     FINGERPRINT_VERSION,
@@ -181,7 +181,6 @@ class _Writer:
     by_category: Counter = field(default_factory=Counter)
     by_subject: Counter = field(default_factory=Counter)
     groups: Dict[str, set] = field(default_factory=lambda: {s: set() for s in SPLITS})
-    train_characters: set = field(default_factory=lambda: {"\n"})
     longest: int = 0
     over_block: int = 0
     same_input: Counter = field(default_factory=Counter)
@@ -218,8 +217,6 @@ class _Writer:
         self.by_category[record.category] += 1
         self.by_subject[f"{record.category}/{record.subject or '-'}"] += 1
         self.same_input[group_hash] += 1
-        if split == "train":
-            self.train_characters.update(text)
         self.longest = max(self.longest, len(text))
         self.over_block += int(len(text) + len(EXAMPLE_SEPARATOR) > self.block_size)
 
@@ -289,7 +286,8 @@ def build_snapshot(store: Any, cfg: Config, page_size: int = 1000) -> Snapshot:
                 f"Add more records (distinct questions), or try another data.supabase.split_seed.")
 
         sha256 = writer.content.hexdigest()
-        tokenizer = CharTokenizer(writer.train_characters).to_dict()
+        tokenizer = build_tokenizer(cfg.data.tokenizer, (building / "train.txt").read_text(encoding="utf-8"),
+                                    vocab_size=cfg.data.vocab_size).to_dict()
         manifest = {
             "format": SNAPSHOT_FORMAT,
             "sha256": sha256,
@@ -330,6 +328,7 @@ def build_snapshot(store: Any, cfg: Config, page_size: int = 1000) -> Snapshot:
             },
             "intended": {
                 "tokenizer": cfg.data.tokenizer,
+                "vocab_size": cfg.data.vocab_size,
                 "block_size": cfg.data.block_size,
                 "stride": cfg.data.stride,
             },
