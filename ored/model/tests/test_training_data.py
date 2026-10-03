@@ -280,6 +280,18 @@ def test_subword_model_loads_the_snapshot(store, cfg):
     assert again.dataset.id == prepared.dataset.id and again.dataset.version == 1
 
 
+def test_snapshot_taken_with_another_tokenizer_still_trains(store, cfg):
+    from ored.training.tasks import LanguageModelTask
+
+    cfg.data.tokenizer = "char"
+    prepare_dataset(cfg, store)
+    cfg.data.tokenizer = "subword"
+    task = LanguageModelTask(cfg)
+    task.build_data()
+    assert task.dataset["tokenizer"]["name"] == "subword"
+    assert task.dataset["tokenizer"]["vocab_size"] == task.tokenizer.vocab_size
+
+
 def test_register_versions_by_content(store, cfg):
     first = prepare_dataset(cfg, store).dataset
     cfg.data.supabase.snapshot = ""

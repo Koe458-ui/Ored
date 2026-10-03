@@ -14,7 +14,6 @@ from ored.utils.logging_utils import get_logger, section
 logger = get_logger(__name__)
 
 DEFAULT_CORPUS_DIR = "data/raw/corpus"
-UNK_ID = 0
 WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 

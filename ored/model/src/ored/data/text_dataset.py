@@ -13,7 +13,8 @@ from ored.data.tokenizer import Tokenizer, build_tokenizer
 
 class TextDataset(Dataset):
 
-    def __init__(self, token_ids: torch.Tensor, block_size: int, stride: int) -> None:
+    def __init__(self, token_ids: torch.Tensor, block_size: int, stride: int,
+                 characters: int | None = None) -> None:
         if token_ids.dim() != 1:
             raise ValueError(f"expected a 1-D tensor of ids, got {tuple(token_ids.shape)}")
         if token_ids.numel() < block_size + 1:
@@ -24,6 +25,7 @@ class TextDataset(Dataset):
             )
 
         self.token_ids = token_ids
+        self.characters = int(token_ids.numel()) if characters is None else characters
         self.block_size = block_size
         self.stride = stride
 
@@ -44,10 +46,14 @@ class TextDataset(Dataset):
     def n_tokens(self) -> int:
         return int(self.token_ids.numel())
 
+    @property
+    def chars_per_token(self) -> float:
+        return self.characters / self.n_tokens
+
     def describe(self) -> str:
         return (
             f"{len(self):>6} windows | {self.n_tokens:>9,} tokens | "
-            f"block_size {self.block_size} | stride {self.stride}"
+            f"{self.chars_per_token:.2f} chars/token | block_size {self.block_size} | stride {self.stride}"
         )
 
 
@@ -61,7 +67,7 @@ def build_text_datasets(cfg: Config) -> Tuple[Dict[str, TextDataset], Tokenizer]
     for split in SPLITS:
         ids = torch.tensor(tokenizer.encode(texts[split]), dtype=torch.long)
         stride = cfg.data.stride if split == "train" else cfg.data.block_size
-        datasets[split] = TextDataset(ids, cfg.data.block_size, stride)
+        datasets[split] = TextDataset(ids, cfg.data.block_size, stride, characters=len(texts[split]))
 
     return datasets, tokenizer
 

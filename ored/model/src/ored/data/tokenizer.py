@@ -41,7 +41,6 @@ class Tokenizer:
         raise NotImplementedError
 
     def is_known(self, token_id: int) -> bool:
-        """Whether this token stands for text the tokenizer saw in training."""
         return int(token_id) != 0
 
     @classmethod
@@ -117,11 +116,6 @@ class CharTokenizer(Tokenizer):
         return f"CharTokenizer | vocab_size={self.vocab_size} | symbols: {visible!r} + newline"
 
 
-# GPT-4 style pre-splitting, written with the standard library: English
-# contractions, words with the one non-letter in front of them (usually a space),
-# runs of punctuation, and runs of whitespace with newlines kept together. Merges
-# never cross these boundaries. Digits stay one per token (as in Llama) so sums
-# are read digit by digit; GPT-4 groups up to three.
 PRETOKEN_RE = re.compile(
     r"'(?i:[sdmt]|ll|ve|re)"
     r"|[^\r\n\w]?[^\W\d_]+"
@@ -140,8 +134,6 @@ def pretokenize(text: str) -> List[str]:
 
 
 def _bytes_to_unicode() -> Dict[int, str]:
-    """GPT-2's table giving each of the 256 bytes a printable character, so byte
-    tokens and merges can be stored and read as ordinary strings."""
     printable = (list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1))
                  + list(range(ord("®"), ord("ÿ") + 1)))
     table = {b: chr(b) for b in printable}
@@ -164,14 +156,6 @@ def _to_symbols(word: str) -> str:
 
 @register_tokenizer("subword")
 class SubwordTokenizer(Tokenizer):
-    """Byte-level byte-pair encoding, the scheme behind GPT-2, GPT-4 and Llama 3.
-
-    Text is read as UTF-8 bytes, so the first 256 ids are the 256 bytes and any
-    text in any language or with any emoji can be encoded: nothing is unknown.
-    The most frequent adjacent pairs inside a pre-split piece of the training text
-    are then merged into longer tokens until the vocabulary reaches ``vocab_size``.
-    """
-
     def __init__(self, merges: Sequence[Tuple[str, str]] = (), seen_bytes: Iterable[int] = range(256)) -> None:
         self.seen_bytes: List[int] = sorted(set(int(b) for b in seen_bytes))
         self._seen = set(self.seen_bytes)
@@ -261,11 +245,6 @@ class SubwordTokenizer(Tokenizer):
 
 
 def learn_merges(words: Counter, n_merges: int) -> List[Tuple[str, str]]:
-    """Byte-pair encoding: repeatedly merge the most frequent adjacent pair.
-
-    Ties go to the pair that sorts first, so the same text always gives the same
-    merges in the same order.
-    """
     vocab: List[List[str]] = [list(w) for w in sorted(words)]
     counts: List[int] = [words[w] for w in sorted(words)]
     pairs: Counter = Counter()

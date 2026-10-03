@@ -86,3 +86,12 @@ def test_eval_splits_use_non_overlapping_windows(tiny_corpus):
     _, datasets, _ = build_text_dataloaders(tiny_corpus)
     assert datasets["val"].stride == tiny_corpus.data.block_size
     assert datasets["test"].stride == tiny_corpus.data.block_size
+
+
+def test_bits_per_character_counts_characters_not_tokens(tiny_corpus):
+    datasets, tokenizer = build_text_datasets(tiny_corpus)
+    train_text = read_corpus(tiny_corpus.data.corpus.dir, "train")
+    train = datasets["train"]
+    assert train.characters == len(train_text)
+    assert train.chars_per_token == len(train_text) / len(tokenizer.encode(train_text))
+    assert train.chars_per_token > 1.0

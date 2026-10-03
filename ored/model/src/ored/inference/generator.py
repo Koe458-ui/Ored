@@ -69,8 +69,6 @@ def generate_tokens(
 
 
 def newline_ids(tokenizer: Tokenizer) -> List[int]:
-    """Every token whose text holds a newline: a subword vocabulary also has
-    tokens such as ".\n" or "\n\n", and any of them ends the line."""
     return [i for i in range(tokenizer.vocab_size) if "\n" in tokenizer.decode([i])]
 
 

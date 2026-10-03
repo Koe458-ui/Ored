@@ -61,8 +61,8 @@ def _legend(metric_names: List[str]) -> str:
     known = {
         "bit_acc": "bit-acc = individual output bits correct",
         "exact_acc": "exact-acc = every bit correct (the real score)",
-        "bpc": "bpc = bits per character (5.3 = knows nothing, 1.0 = knows words, lower is better)",
-        "ppl": "ppl = perplexity, how many characters it is still choosing between",
+        "bpc": "bpc = bits per character of text (lower is better)",
+        "ppl": "ppl = perplexity, how many tokens it is still choosing between",
     }
     parts = [known.get(name, name) for name in metric_names]
     return "; ".join(parts) if parts else "loss only"

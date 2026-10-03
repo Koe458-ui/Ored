@@ -22,7 +22,6 @@ logger = get_logger(__name__)
 
 DEFAULT_CHECKPOINT = "checkpoints/char_transformer/best.pt"
 DEFAULT_LIVE_DIR = "checkpoints/live"
-UNK_ID = 0
 
 
 @dataclass

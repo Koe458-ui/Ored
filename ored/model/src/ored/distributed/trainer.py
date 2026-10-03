@@ -94,7 +94,8 @@ class DistributedTrainer(Trainer):
     def _train_one_epoch(self) -> Dict[str, float]:
         self.control.set_status("training")
         super()._train_one_epoch()
-        return reduce_metrics(self.env, self.train_metrics, self.cfg.task)
+        return reduce_metrics(self.env, self.train_metrics, self.cfg.task,
+                              chars_per_token=getattr(self.task, "chars_per_token", 1.0))
 
     @torch.no_grad()
     def evaluate(self, split: str) -> Dict[str, float]:
@@ -106,7 +107,8 @@ class DistributedTrainer(Trainer):
             metrics.update(batch_size=batch_size, loss=loss.item(), **extra)
             if self.cfg.task == "language_model":
                 tokens += int(batch[1].numel())
-        return reduce_metrics(self.env, metrics, self.cfg.task, tokens)
+        return reduce_metrics(self.env, metrics, self.cfg.task, tokens,
+                              chars_per_token=getattr(self.task, "chars_per_token", 1.0))
 
     def _warm_start(self, path: str) -> None:
         problem = None
