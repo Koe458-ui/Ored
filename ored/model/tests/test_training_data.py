@@ -274,7 +274,6 @@ def test_subword_model_loads_the_snapshot(store, cfg):
     assert tokenizer.name == "subword"
     assert len(tokenizer.itos) == prepared.snapshot.manifest["tokenizer"]["vocab_size"]
     train_text = (prepared.snapshot.directory / "train.txt").read_text(encoding="utf-8")
-    assert set(tokenizer.alphabet) == set(train_text)
     assert tokenizer.decode(tokenizer.encode(train_text)) == train_text
     assert all(len(datasets[s]) > 0 for s in ("train", "val", "test"))
     again = prepare_dataset(cfg, store)

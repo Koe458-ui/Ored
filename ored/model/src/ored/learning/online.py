@@ -159,7 +159,7 @@ class OnlineLearner:
         ids = self.tokenizer.encode(text)
         if not ids:
             return [], 0.0
-        known = sum(1 for i in ids if i != UNK_ID)
+        known = sum(1 for i in ids if self.tokenizer.is_known(i))
         return ids, known / len(ids)
 
     def _window(self, ids: List[int]) -> List[int]:

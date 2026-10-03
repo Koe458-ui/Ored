@@ -211,12 +211,16 @@ refuses a damaged folder. `data/snapshots/` is ignored by Git.
 (`data.supabase.on_invalid: skip`) leaves them out instead and lists them in the
 manifest.
 
-**Tokenizer.** The subword (BPE) tokenizer is learned from `train.txt`
-exactly as it is learned from the generated corpus: every character of the
-training text is a token, and the most frequent adjacent pairs inside a word are
-merged until the vocabulary reaches `data.vocab_size` (default 1024). Digits and
-newlines stay single tokens. `data.tokenizer: char` still selects the
-character tokenizer. Its sha256 is written into the
+**Tokenizer.** A byte-level BPE tokenizer, the scheme GPT-2, GPT-4 and Llama 3
+use, is learned from `train.txt` exactly as it is learned from the generated
+corpus. Text is read as UTF-8 bytes, so ids 0–255 are the 256 bytes and any text
+can be encoded. The text is first split GPT-4 style (contractions, a word with the
+space in front of it, punctuation, whitespace), and inside each piece the most
+frequent adjacent pair is merged again and again until the vocabulary reaches
+`data.vocab_size` (default 1024). Digits stay one per token so sums are read
+digit by digit. The tokenizer records which bytes appeared in training; online
+learning refuses text made mostly of other bytes, and generation never samples
+them. `data.tokenizer: char` still selects the character tokenizer. Its sha256 is written into the
 manifest when the snapshot is taken and checked again when training builds it.
 
 ## Versions: `ored_datasets`

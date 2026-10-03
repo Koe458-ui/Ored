@@ -68,7 +68,8 @@ def test_corpus_arithmetic_is_correct(tiny_corpus):
 def test_tokenizer_is_fitted_on_training_text_only(tiny_corpus):
     datasets, tokenizer = build_text_datasets(tiny_corpus)
     train_text = read_corpus(tiny_corpus.data.corpus.dir, "train")
-    assert set(tokenizer.alphabet) == set(train_text)
+    learned = {tokenizer.decode([i]) for i in range(256, tokenizer.vocab_size)}
+    assert learned and all(piece in train_text for piece in learned)
     assert len(tokenizer.encode(train_text)) < len(train_text)
 
 

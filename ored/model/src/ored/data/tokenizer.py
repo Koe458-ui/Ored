@@ -40,6 +40,10 @@ class Tokenizer:
     def to_dict(self) -> Dict[str, Any]:
         raise NotImplementedError
 
+    def is_known(self, token_id: int) -> bool:
+        """Whether this token stands for text the tokenizer saw in training."""
+        return int(token_id) != 0
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Tokenizer":
         key = data["name"].lower()
@@ -113,10 +117,20 @@ class CharTokenizer(Tokenizer):
         return f"CharTokenizer | vocab_size={self.vocab_size} | symbols: {visible!r} + newline"
 
 
-# Words keep the single space in front of them, digits stay one per token so sums
-# are read digit by digit, and a newline is always a token of its own.
+# GPT-4 style pre-splitting, written with the standard library: English
+# contractions, words with the one non-letter in front of them (usually a space),
+# runs of punctuation, and runs of whitespace with newlines kept together. Merges
+# never cross these boundaries. Digits stay one per token (as in Llama) so sums
+# are read digit by digit; GPT-4 groups up to three.
 PRETOKEN_RE = re.compile(
-    r"\n|[^\S\n]?[^\W\d_]+|[^\S\n]?\d|[^\S\n]?[^\s\w]+|[^\S\n]?_+|[^\S\n]+"
+    r"'(?i:[sdmt]|ll|ve|re)"
+    r"|[^\r\n\w]?[^\W\d_]+"
+    r"|_+"
+    r"|\d"
+    r"| ?[^\s\w]+[\r\n]*"
+    r"|\s*[\r\n]+"
+    r"|\s+(?!\S)"
+    r"|\s+"
 )
 DEFAULT_SUBWORD_VOCAB = 1024
 
@@ -125,48 +139,76 @@ def pretokenize(text: str) -> List[str]:
     return PRETOKEN_RE.findall(text)
 
 
+def _bytes_to_unicode() -> Dict[int, str]:
+    """GPT-2's table giving each of the 256 bytes a printable character, so byte
+    tokens and merges can be stored and read as ordinary strings."""
+    printable = (list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1))
+                 + list(range(ord("®"), ord("ÿ") + 1)))
+    table = {b: chr(b) for b in printable}
+    extra = 0
+    for b in range(256):
+        if b not in table:
+            table[b] = chr(256 + extra)
+            extra += 1
+    return table
+
+
+BYTE_TO_CHAR: Dict[int, str] = _bytes_to_unicode()
+CHAR_TO_BYTE: Dict[str, int] = {c: b for b, c in BYTE_TO_CHAR.items()}
+BASE_TOKENS: List[str] = [BYTE_TO_CHAR[b] for b in range(256)]
+
+
+def _to_symbols(word: str) -> str:
+    return "".join(BYTE_TO_CHAR[b] for b in word.encode("utf-8"))
+
+
 @register_tokenizer("subword")
 class SubwordTokenizer(Tokenizer):
-    """Byte-pair encoding over characters.
+    """Byte-level byte-pair encoding, the scheme behind GPT-2, GPT-4 and Llama 3.
 
-    Every character of the training text is a token, so nothing it has seen is
-    unknown, and the most frequent adjacent pairs inside a word are merged into
-    longer pieces until the vocabulary reaches ``vocab_size``.
+    Text is read as UTF-8 bytes, so the first 256 ids are the 256 bytes and any
+    text in any language or with any emoji can be encoded: nothing is unknown.
+    The most frequent adjacent pairs inside a pre-split piece of the training text
+    are then merged into longer tokens until the vocabulary reaches ``vocab_size``.
     """
 
-    def __init__(self, characters: Iterable[str], merges: Sequence[Tuple[str, str]] = ()) -> None:
-        alphabet = sorted(set(characters))
-        if UNK_TOKEN in alphabet:
-            alphabet.remove(UNK_TOKEN)
-        self.alphabet: List[str] = alphabet
+    def __init__(self, merges: Sequence[Tuple[str, str]] = (), seen_bytes: Iterable[int] = range(256)) -> None:
+        self.seen_bytes: List[int] = sorted(set(int(b) for b in seen_bytes))
+        self._seen = set(self.seen_bytes)
         self.merges: List[Tuple[str, str]] = [(a, b) for a, b in merges]
-        self.itos: List[str] = [UNK_TOKEN] + alphabet + [a + b for a, b in self.merges]
-        self._index()
-
-    def _index(self) -> None:
+        self.itos: List[str] = BASE_TOKENS + [a + b for a, b in self.merges]
         self.stoi: Dict[str, int] = {}
-        for i, s in enumerate(self.itos):
-            self.stoi.setdefault(s, i)
+        for i, token in enumerate(self.itos):
+            self.stoi.setdefault(token, i)
         self.ranks: Dict[Tuple[str, str], int] = {pair: i for i, pair in enumerate(self.merges)}
         self._cache: Dict[str, List[int]] = {}
 
     @classmethod
     def from_text(cls, text: str, vocab_size: int = DEFAULT_SUBWORD_VOCAB, **_: Any) -> "SubwordTokenizer":
-        characters = set(text) | {"\n"}
-        characters.discard(UNK_TOKEN)
-        n_merges = vocab_size - 1 - len(characters)
-        words = Counter(w for w in pretokenize(text) if w != "\n")
-        return cls(characters, learn_merges(words, n_merges))
+        if vocab_size < len(BASE_TOKENS):
+            raise ValueError(f"a byte-level tokenizer needs vocab_size >= {len(BASE_TOKENS)}, "
+                             f"got {vocab_size}")
+        words = Counter(_to_symbols(w) for w in pretokenize(text))
+        seen = set(text.encode("utf-8")) | {ord("\n")}
+        return cls(learn_merges(words, vocab_size - len(BASE_TOKENS)), seen)
 
     @property
     def vocab_size(self) -> int:
         return len(self.itos)
 
+    @property
+    def alphabet(self) -> List[str]:
+        return [chr(b) for b in self.seen_bytes if b < 128]
+
+    def is_known(self, token_id: int) -> bool:
+        token_id = int(token_id)
+        return token_id >= len(BASE_TOKENS) or token_id in self._seen
+
     def _encode_word(self, word: str) -> List[int]:
         cached = self._cache.get(word)
         if cached is not None:
             return cached
-        pieces = list(word)
+        pieces = list(_to_symbols(word))
         while len(pieces) > 1:
             best = None
             for i in range(len(pieces) - 1):
@@ -177,7 +219,7 @@ class SubwordTokenizer(Tokenizer):
                 break
             i = best[1]
             pieces[i:i + 2] = [pieces[i] + pieces[i + 1]]
-        ids = [self.stoi.get(p, 0) for p in pieces]
+        ids = [self.stoi[p] for p in pieces]
         if len(self._cache) < 100_000:
             self._cache[word] = ids
         return ids
@@ -188,32 +230,33 @@ class SubwordTokenizer(Tokenizer):
             ids.extend(self._encode_word(word))
         return ids
 
+    def token_bytes(self, index: int) -> bytes:
+        if not 0 <= index < len(self.itos):
+            raise ValueError(
+                f"token id {index} is outside this tokenizer's vocabulary "
+                f"(0..{len(self.itos) - 1})"
+            )
+        return bytes(CHAR_TO_BYTE[c] for c in self.itos[index])
+
     def decode(self, ids: Sequence[int]) -> str:
-        pieces = []
-        for token_id in ids:
-            index = int(token_id)
-            if not 0 <= index < len(self.itos):
-                raise ValueError(
-                    f"token id {index} is outside this tokenizer's vocabulary "
-                    f"(0..{len(self.itos) - 1})"
-                )
-            pieces.append(self.itos[index])
-        return "".join(p for p in pieces if p != UNK_TOKEN)
+        data = b"".join(self.token_bytes(int(i)) for i in ids)
+        return data.decode("utf-8", errors="replace")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": "subword", "itos": self.itos,
-                "alphabet": self.alphabet, "merges": [list(m) for m in self.merges]}
+        return {"name": "subword", "kind": "byte_bpe", "itos": self.itos,
+                "merges": [list(m) for m in self.merges], "seen_bytes": self.seen_bytes}
 
     @classmethod
     def _from_dict(cls, data: Dict[str, Any]) -> "SubwordTokenizer":
-        tokenizer = cls(data["alphabet"], [tuple(m) for m in data["merges"]])
+        tokenizer = cls([tuple(m) for m in data["merges"]], data.get("seen_bytes", range(256)))
         if tokenizer.itos != list(data["itos"]):
-            raise ValueError("subword tokenizer's itos does not match its alphabet and merges")
+            raise ValueError("subword tokenizer's itos does not match its merges")
         return tokenizer
 
     def describe(self) -> str:
-        longest = sorted(self.itos[1 + len(self.alphabet):], key=len, reverse=True)[:5]
-        return (f"SubwordTokenizer | vocab_size={self.vocab_size} | {len(self.alphabet)} characters "
+        longest = sorted((self.decode([i]) for i in range(len(BASE_TOKENS), self.vocab_size)),
+                         key=len, reverse=True)[:5]
+        return (f"SubwordTokenizer (byte-level BPE) | vocab_size={self.vocab_size} | 256 bytes "
                 f"+ {len(self.merges)} merges | longest pieces: {longest!r}")
 
 

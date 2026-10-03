@@ -19,6 +19,7 @@ def generate_tokens(
     top_p: float = 0.0,
     greedy: bool = False,
     stop_ids: Optional[List[int]] = None,
+    banned_ids: Optional[List[int]] = None,
 ) -> torch.Tensor:
     if ids.dim() != 2 or ids.size(0) != 1:
         raise ValueError(f"expected ids of shape (1, T), got {tuple(ids.shape)}")
@@ -34,6 +35,9 @@ def generate_tokens(
         logits = model(context)
 
         logits = logits[:, -1, :]
+        if banned_ids:
+            logits = logits.clone()
+            logits[:, banned_ids] = float("-inf")
 
         if greedy:
             next_id = logits.argmax(dim=-1, keepdim=True)
@@ -64,6 +68,12 @@ def generate_tokens(
     return ids
 
 
+def newline_ids(tokenizer: Tokenizer) -> List[int]:
+    """Every token whose text holds a newline: a subword vocabulary also has
+    tokens such as ".\n" or "\n\n", and any of them ends the line."""
+    return [i for i in range(tokenizer.vocab_size) if "\n" in tokenizer.decode([i])]
+
+
 def generate_text(
     model: torch.nn.Module,
     tokenizer: Tokenizer,
@@ -80,7 +90,7 @@ def generate_text(
     text = prompt if prompt else "\n"
     ids = torch.tensor([tokenizer.encode(text)], dtype=torch.long, device=device)
 
-    stop_ids = tokenizer.encode("\n") if stop_on_newline else None
+    stop_ids = newline_ids(tokenizer) if stop_on_newline else None
 
     out = generate_tokens(
         model=model,
@@ -92,6 +102,7 @@ def generate_text(
         top_p=top_p,
         greedy=greedy,
         stop_ids=stop_ids,
+        banned_ids=[i for i in range(tokenizer.vocab_size) if not tokenizer.is_known(i)],
     )
     return tokenizer.decode(out[0].tolist())
 

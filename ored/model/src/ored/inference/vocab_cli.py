@@ -67,8 +67,8 @@ def inspect(
 
         min_known_ratio = OnlinePolicy().min_known_ratio
     ids = tokenizer.encode(text)
-    unknown = sorted({c for c in set(text) if UNK_ID in tokenizer.encode(c)})
-    ratio = sum(1 for i in ids if i != UNK_ID) / len(ids) if ids else 0.0
+    unknown = sorted({c for c in set(text) if not all(map(tokenizer.is_known, tokenizer.encode(c)))})
+    ratio = sum(1 for i in ids if tokenizer.is_known(i)) / len(ids) if ids else 0.0
 
     unseen = None
     if known_words is not None:

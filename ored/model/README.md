@@ -482,7 +482,7 @@ Ored.ai/
 │   │   ├── dataset.py          # Dataset + DataLoader (batching)
 │   │   ├── corpus.py           # text corpus, disjoint operand splits
 │   │   ├── facts.py            # question-and-answer lines mixed into the corpus
-│   │   ├── tokenizer.py        # char + subword (BPE) tokenizers + registry
+│   │   ├── tokenizer.py        # char + byte-level BPE tokenizers + registry
 │   │   └── text_dataset.py     # sequence windows, shift-by-one targets
 │   ├── models/
 │   │   ├── base.py             # the interface every model implements
@@ -1112,7 +1112,7 @@ solved in one forward pass.
 |---|---|
 | Corpus generator with disjoint operand splits | ✅ |
 | Character tokenizer, registry, exact round-trip, saved in checkpoints | ✅ |
-| Subword (BPE) tokenizer — the default (`data.tokenizer: subword`, `data.vocab_size`) | ✅ |
+| Byte-level BPE tokenizer, as in GPT-2/GPT-4/Llama 3 — the default (`data.tokenizer: subword`, `data.vocab_size`) | ✅ |
 | Sequence dataset with shift-by-one targets, stride windows | ✅ |
 | Decoder-only Transformer written from scratch | ✅ |
 | Causal masking, verified numerically | ✅ |
