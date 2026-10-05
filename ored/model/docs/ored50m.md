@@ -1,17 +1,17 @@
-# Ored AI ~50M: model, data pipeline, storage and checkpoints
+# Ored AI ~50M (ored50m): model, data pipeline, storage and checkpoints
 
-`ored_50m` is a new model generation. It does not load, extend or replace the existing
-~5.13M `char_transformer` model: that model keeps its config, its Supabase snapshot
-pipeline, its tokenizer-in-checkpoint behaviour and its base/live/best/history
-checkpoints, unchanged.
+`ored50m` is the only language model. It replaced the ~5.13M `char_transformer`, whose
+config was removed (it is still in git history).
 
-| | char_transformer (existing) | ored_50m (new) |
-|---|---|---|
-| config | `configs/char_transformer.yaml` | `configs/ored_50m.yaml` |
-| entry point | `scripts/train.py` | `scripts/pretrain.py` (`scripts/train.py --config configs/ored_50m.yaml` dispatches to it too) |
-| data | Supabase `ored_training_data` snapshot, loaded into RAM | pre-tokenized shards (memory-mapped), files in R2 |
-| tokenizer | rebuilt from `train.txt` each run, stored in the checkpoint | trained once, a versioned artifact; checkpoints record its sha256 |
-| checkpoints | base / live / best / history | `best.pt` only |
+| | |
+|---|---|
+| config | `configs/ored50m.yaml` |
+| entry point | `scripts/pretrain.py` (`scripts/train.py --config configs/ored50m.yaml` dispatches to it too) |
+| data | pre-tokenized shards (memory-mapped), files in R2; never the rows in Supabase |
+| tokenizer | trained once, a versioned artifact; checkpoints record its sha256 |
+| checkpoints | `best.pt` only |
+
+The step-by-step commands are in `Guide to train` at the repository root.
 
 ## Model
 
@@ -23,19 +23,18 @@ Decoder-only GPT-style transformer, the same `Transformer` class as before
 * 16,384-token vocabulary, token embedding tied to the LM head, no head bias
 * dropout 0.1, normal(0, 0.02) initialisation (unchanged from the existing model)
 * `model.attention: sdpa` -- `torch.nn.functional.scaled_dot_product_attention(is_causal=True)`,
-  which lets PyTorch pick flash / memory-efficient kernels. `manual` (the default, used by
-  `char_transformer`) keeps the explicit T x T score matrix. Same parameters, same function
+  which lets PyTorch pick flash / memory-efficient kernels. `manual` (the default) keeps the explicit T x T score matrix. Same parameters, same function
   (a test checks they agree).
 * `model.gradient_checkpointing` -- recompute each block in the backward pass.
 
 **Parameters: 49,894,912**, computed by the model itself
 (`python scripts/pretrain.py --describe`). `model.expected_parameters` makes training refuse
-a config that drifts more than 1% from that, and `tests/test_ored_50m.py` asserts the exact
+a config that drifts more than 1% from that, and `tests/test_ored50m.py` asserts the exact
 number.
 
 ## Training on an 8 GB GPU (RTX 5060 Laptop)
 
-Defaults in `configs/ored_50m.yaml`:
+Defaults in `configs/ored50m.yaml`:
 
 * micro-batch 4 x 1024 tokens, `grad_accum_steps: 8` -> 32 sequences = 32,768 tokens per
   optimizer step
@@ -190,5 +189,5 @@ architecture, tokenizer and dataset, so an old `char_transformer` checkpoint is 
    `scripts/corpus.py update-registry ... --set status=ready --set document_count=...` as
    facts become known.
 3. Train the tokenizer artifact, build the shards, `publish` them.
-4. Set `data.tokens.*` in `configs/ored_50m.yaml` (dataset name / version / registry id,
+4. Set `data.tokens.*` in `configs/ored50m.yaml` (dataset name / version / registry id,
    tokenizer artifact path), run `--probe-batch-size` on the GPU, then train.

@@ -196,12 +196,10 @@ def load_fact_subjects(directory: str | Path) -> List[str]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Write the corpus with a set of questions Ored should answer.",
-        epilog="Edit configs/facts.yaml, run this, then train:\n"
-               "  python scripts/generate_facts.py\n"
-               "  python scripts/train.py --config configs/char_transformer.yaml",
+        epilog="Edit configs/facts.yaml, then run this with --config.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--config", default="configs/char_transformer.yaml")
+    parser.add_argument("--config", required=True)
     parser.add_argument("--facts", default=DEFAULT_FACTS)
     parser.add_argument("--repeats", type=int, default=60,
                         help="how many times each fact appears in the training corpus")

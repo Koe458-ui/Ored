@@ -47,8 +47,6 @@ server-side secrets: never put them in a browser, a public asset or Git.
   pull --dataset-tag T --snapshot HASH   download a snapshot taken elsewhere
   lineage CHECKPOINT           which training data produced a checkpoint
   taxonomy                     the valid types and categories
-
-Training:  python scripts/train.py --config configs/char_transformer.yaml --supabase-dataset T --upload
 """
 
 
@@ -415,7 +413,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("snapshot", "pull"):
         p = sub.add_parser(name)
         _filters(p, tag_required=True)
-        p.add_argument("--config", default="configs/char_transformer.yaml")
+        p.add_argument("--config", required=True)
         p.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
         p.add_argument("--snapshot", required=name == "pull", metavar="HASH")
         if name == "snapshot":

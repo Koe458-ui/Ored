@@ -41,7 +41,7 @@ from test_inference import trained_lm_checkpoint
 
 MIGRATION = (Path(__file__).resolve().parents[2] / "supabase" / "migrations"
              / "20260926120000_ored_training_data.sql")
-CONFIG = Path(__file__).resolve().parent.parent / "configs" / "char_transformer.yaml"
+CONFIG = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
 
 
 def row(type, category, input, output, subject=None, topic=None, **extra):
@@ -390,27 +390,27 @@ def test_train_command_line_selects_supabase(remote, cfg, monkeypatch, tmp_path)
     assert c.data.source == "supabase" and c.data.supabase.dataset_tag == "physics_v1"
     assert c.data.supabase.subjects == ["physics"] and c.data.supabase.include_unverified
     assert c.data.supabase.split_seed == 7 and c.training.epochs == 3 and c.data.batch_size == 4
-    assert c.run_name == "char_transformer-physics_v1"
+    assert c.run_name == "language_model_test-physics_v1"
     seen.clear()
     train_main(["--config", str(CONFIG)])
     assert seen["cfg"].data.source == "supabase" and seen["cfg"].data.supabase.dataset_tag == "all"
-    assert seen["cfg"].run_name == "char_transformer"
+    assert seen["cfg"].run_name == "language_model_test"
     seen.clear()
     train_main(["--config", str(CONFIG), "--set", "run_name=ored_v207"])
     assert seen["cfg"].data.source == "supabase" and seen["cfg"].run_name == "ored_v207"
     seen.clear()
     train_main(["--config", str(CONFIG), "--supabase-dataset"])
-    assert seen["cfg"].data.supabase.dataset_tag == "all" and seen["cfg"].run_name == "char_transformer-all"
+    assert seen["cfg"].data.supabase.dataset_tag == "all" and seen["cfg"].run_name == "language_model_test-all"
     seen.clear()
     train_main(["--config", str(CONFIG), "--generated-corpus"])
-    assert seen["cfg"].data.source == "generated" and seen["cfg"].run_name == "char_transformer"
+    assert seen["cfg"].data.source == "generated" and seen["cfg"].run_name == "language_model_test"
     with pytest.raises(ValueError, match="generated-corpus"):
         train_main(["--config", str(CONFIG), "--generated-corpus", "--supabase-dataset", "facts"])
 
 
 def test_the_shipped_configs_train_on_supabase_by_default():
-    for name in ("char_transformer.yaml", "char_bigram.yaml"):
-        cfg = load_config(CONFIG.parent / name)
+    for path in (CONFIG, CONFIG.parents[2] / "configs" / "char_bigram.yaml"):
+        cfg = load_config(path)
         assert cfg.data.source == "supabase" and cfg.data.supabase.dataset_tag == "all"
 
 
@@ -505,7 +505,7 @@ def test_supabase_source_needs_a_tag_and_the_language_model():
     with pytest.raises(ValueError, match="dataset_tag"):
         load_config(CONFIG, overrides=["data.source=supabase", "data.supabase.dataset_tag="])
     with pytest.raises(ValueError, match="language_model"):
-        load_config(CONFIG.parent / "bit_adder_mlp.yaml",
+        load_config(CONFIG.parents[2] / "configs" / "bit_adder_mlp.yaml",
                     overrides=["data.source=supabase", "data.supabase.dataset_tag=all"])
     with pytest.raises(StoreError):
         InMemoryStore().update_training_data("nope", verified=True)

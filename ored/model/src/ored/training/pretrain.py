@@ -482,7 +482,7 @@ def probe_batch_sizes(cfg: Config, candidates: Sequence[int] = (1, 2, 4, 6, 8, 1
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Pretrain the ~50M Ored model on token shards.")
-    parser.add_argument("--config", default="configs/ored_50m.yaml")
+    parser.add_argument("--config", default="configs/ored50m.yaml")
     parser.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
     parser.add_argument("--resume", action="store_true", help="continue from this run's best.pt")
     parser.add_argument("--describe", action="store_true",

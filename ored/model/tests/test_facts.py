@@ -190,7 +190,7 @@ def test_repeats_must_be_positive(tiny_lm_cfg, spec):
 
 def test_the_cli_writes_a_corpus_from_the_shipped_facts(tiny_lm_cfg, tmp_path):
     exit_code = facts_main([
-        "--config", str(CONFIGS / "char_transformer.yaml"),
+        "--config", str(Path(__file__).resolve().parent / "configs" / "language_model.yaml"),
         "--facts", DEFAULT_FACTS,
         "--repeats", "3",
         "--set", f"data.corpus.dir={tmp_path / 'corpus'}",
@@ -205,4 +205,5 @@ def test_the_cli_writes_a_corpus_from_the_shipped_facts(tiny_lm_cfg, tmp_path):
 
 
 def test_the_cli_reports_a_missing_facts_file(tmp_path):
-    assert facts_main(["--facts", str(tmp_path / "nope.yaml")]) == 1
+    assert facts_main(["--config", str(Path(__file__).resolve().parent / "configs" / "language_model.yaml"),
+                      "--facts", str(tmp_path / "nope.yaml")]) == 1

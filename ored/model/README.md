@@ -8,10 +8,11 @@ generated ourselves, using a training loop we wrote ourselves.
 > configuration, no dataset, no model, no ML framework, no training pipeline.
 > Everything below was built from zero.
 
-> **Next generation: Ored AI ~50M** (`configs/ored_50m.yaml`, 49,894,912 parameters) trains
+> **The current model is ored50m** (`configs/ored50m.yaml`, 49,894,912 parameters). It trains
 > on pre-tokenized shards stored in Cloudflare R2, keeps only `best.pt`, and registers its
-> datasets in Supabase as metadata only. It sits alongside the models below without
-> changing them: see [`docs/ored-50m.md`](docs/ored-50m.md).
+> datasets in Supabase as metadata only: see [`docs/ored50m.md`](docs/ored50m.md) and
+> `Guide to train`. The Step 2 `char_transformer` model below was removed; its
+> `configs/char_transformer.yaml` commands no longer run.
 
 ---
 

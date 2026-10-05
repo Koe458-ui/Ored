@@ -1,4 +1,4 @@
-run_name: char_transformer
+run_name: language_model_test
 task: language_model
 seed: 1337
 deterministic: true

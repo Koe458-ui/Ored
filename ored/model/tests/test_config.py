@@ -51,7 +51,7 @@ def test_text_settings_stay_text_when_they_look_like_numbers():
 
     from ored.config import load_config
 
-    path = Path(__file__).resolve().parent.parent / "configs" / "char_transformer.yaml"
+    path = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
     cfg = load_config(path, ["data.source=supabase", "data.supabase.dataset_tag=2024",
                              "data.supabase.snapshot=" + "1e5" + "0" * 61, "run_name=007",
                              "training.epochs=3", "training.learning_rate=1e-4", "data.shuffle_train=false"])

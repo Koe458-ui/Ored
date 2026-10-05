@@ -624,7 +624,7 @@ def _log_summary(cfg, stats, pairs_by_split) -> None:
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate the Ored.ai text corpus.")
-    parser.add_argument("--config", default="configs/char_transformer.yaml")
+    parser.add_argument("--config", required=True)
     parser.add_argument("--set", dest="overrides", action="append", default=[],
                         metavar="KEY=VALUE")
     parser.add_argument("--force", action="store_true", help="regenerate even if it exists")

@@ -41,7 +41,7 @@ from ored.training.pretrain import PretrainError, PretrainTrainer, check_paramet
 from test_r2_store import FakeS3
 
 CONFIGS = Path(__file__).resolve().parent.parent / "configs"
-CONFIG_50M = CONFIGS / "ored_50m.yaml"
+CONFIG_50M = CONFIGS / "ored50m.yaml"
 MIGRATIONS = Path(__file__).resolve().parents[2] / "supabase" / "migrations"
 EXPECTED_50M = 49_894_912
 
@@ -119,8 +119,9 @@ def test_parameter_drift_is_detected():
         check_parameter_count(cfg, model.num_parameters())
 
 
-def test_existing_5m_model_is_unchanged():
-    cfg = load_config(CONFIGS / "char_transformer.yaml")
+def test_char_transformer_config_is_gone_and_defaults_stay_manual():
+    assert not (CONFIGS / "char_transformer.yaml").exists() and not (CONFIGS / "ored_50m.yaml").exists()
+    cfg = load_config(Path(__file__).resolve().parent / "configs" / "language_model.yaml")
     assert cfg.model.attention == "manual" and cfg.checkpoint.policy == "roles"
     model = build_model(cfg, vocab_size=1024)
     assert model.num_parameters() == 5_132_288
@@ -328,7 +329,7 @@ def test_object_layout():
     assert layout.dataset_manifest("common-pile", "v0.1-1gb") == "ored-ai/datasets/common-pile/v0.1-1gb/manifest.json"
     assert layout.dataset_file("common-pile", "v0.1-1gb", "shard-000.parquet") == \
         "ored-ai/datasets/common-pile/v0.1-1gb/shard-000.parquet"
-    assert layout.checkpoint_best("ored_50m") == "ored-ai/checkpoints/ored_50m/best.pt"
+    assert layout.checkpoint_best("ored50m") == "ored-ai/checkpoints/ored50m/best.pt"
     assert layout.tokenizer_artifact("ored-bpe-16k", "v1") == "ored-ai/tokenizers/ored-bpe-16k/v1/tokenizer.json"
     for bad in ("..", "a/b", "", "../x"):
         with pytest.raises(LayoutError):
@@ -347,7 +348,7 @@ def test_token_dataset_round_trip_through_fake_r2(shards, r2, tmp_path):
 
 
 def test_replace_object_keeps_one_best(r2, tmp_path):
-    key = ObjectLayout().checkpoint_best("ored_50m")
+    key = ObjectLayout().checkpoint_best("ored50m")
     for size in (100, 250):
         path = tmp_path / f"best-{size}.pt"
         path.write_bytes(b"x" * size)
@@ -394,7 +395,7 @@ def test_config_pairs_token_data_with_best_only():
 
 
 def _payload(epoch, value, tokenizer_sha="t" * 64):
-    return {"schema": CHECKPOINT_SCHEMA, "model_version": "ored_50m", "architecture": {"type": "T"},
+    return {"schema": CHECKPOINT_SCHEMA, "model_version": "ored50m", "architecture": {"type": "T"},
             "model_state_dict": {"w": torch.full((3,), float(epoch))}, "epoch": epoch,
             "best": {"metric": "val_loss", "mode": "min", "value": value},
             "tokenizer": {"sha256": tokenizer_sha}, "dataset": {"content_sha256": "d" * 64}, "config": {}}
@@ -433,14 +434,14 @@ def test_failed_save_leaves_the_previous_best(tmp_path, monkeypatch):
 
 def test_checkpoint_compatibility_checks(tmp_path):
     payload = _payload(1, 1.0)
-    check_compatible(payload, model_version="ored_50m", architecture={"type": "T"}, tokenizer_sha256="t" * 64)
+    check_compatible(payload, model_version="ored50m", architecture={"type": "T"}, tokenizer_sha256="t" * 64)
     with pytest.raises(BestCheckpointError, match="tokenizer"):
-        check_compatible(payload, model_version="ored_50m", architecture={"type": "T"}, tokenizer_sha256="u" * 64)
+        check_compatible(payload, model_version="ored50m", architecture={"type": "T"}, tokenizer_sha256="u" * 64)
     with pytest.raises(BestCheckpointError, match="model version"):
         check_compatible(payload, model_version="char_transformer", architecture={"type": "T"},
                          tokenizer_sha256="t" * 64)
     with pytest.raises(BestCheckpointError, match="dataset"):
-        check_compatible(payload, model_version="ored_50m", architecture={"type": "T"},
+        check_compatible(payload, model_version="ored50m", architecture={"type": "T"},
                          tokenizer_sha256="t" * 64, dataset_sha256="e" * 64)
     torch.save({"format_version": 2, "model_state_dict": {}}, tmp_path / "best.pt")
     with pytest.raises(BestCheckpointError, match="older Ored model"):
@@ -478,14 +479,14 @@ def test_pretrain_saves_only_best_and_replaces_it(shards, tmp_path, artifact, r2
     run_dir = Path(cfg.checkpoint_dir)
     assert sorted(p.name for p in run_dir.iterdir()) == ["best.pt", "history.json"]
     payload = torch.load(run_dir / "best.pt", weights_only=True)
-    assert payload["epoch"] == 3 and payload["model_version"] == "ored_50m"
+    assert payload["epoch"] == 3 and payload["model_version"] == "ored50m"
     assert payload["tokenizer"]["sha256"] == manifest["tokenizer"]["sha256"]
     assert payload["dataset"]["content_sha256"] == manifest["content_sha256"]
     assert payload["dataset"]["manifest_sha256"] and payload["dataset"]["sources"][0]["sha256"]
     for key in ("optimizer_state_dict", "scheduler", "config", "code", "architecture", "global_step"):
         assert key in payload
-    assert list(FakeS3.objects) == ["ored-ai/checkpoints/ored_50m/best.pt"]
-    assert FakeS3.objects["ored-ai/checkpoints/ored_50m/best.pt"] == (run_dir / "best.pt").read_bytes()
+    assert list(FakeS3.objects) == ["ored-ai/checkpoints/ored50m/best.pt"]
+    assert FakeS3.objects["ored-ai/checkpoints/ored50m/best.pt"] == (run_dir / "best.pt").read_bytes()
 
     resumed = PretrainTrainer(tiny_cfg(tmp_path, out, artifact, **{"training.resume": "best",
                                                                    "training.epochs": 4}))

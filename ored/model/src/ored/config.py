@@ -423,9 +423,12 @@ class Config:
             raise ValueError("data.source: supabase feeds the language_model task only")
         if self.data.source == "tokens" and self.task != "language_model":
             raise ValueError("data.source: tokens feeds the language_model task only")
-        if (self.data.source == "tokens") != (self.checkpoint.policy == "best_only"):
-            raise ValueError("data.source: tokens trains with the best-only pretraining loop, so it "
-                             "goes with checkpoint.policy: best_only (and only it)")
+        if self.checkpoint.policy == "best_only" and self.data.source != "tokens":
+            raise ValueError(f"this config (checkpoint.policy: best_only, e.g. ored50m) trains only on token "
+                             f"shards from R2 (data.source: tokens), not on data.source: {self.data.source}")
+        if self.data.source == "tokens" and self.checkpoint.policy != "best_only":
+            raise ValueError("data.source: tokens trains with the best-only pretraining loop: "
+                             "set checkpoint.policy: best_only")
         if self.data.source == "tokens" and self.distributed.enabled:
             raise ValueError("data.source: tokens is single-GPU for now; distributed.enabled must be false")
         self.data.validate()
