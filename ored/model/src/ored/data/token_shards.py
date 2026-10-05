@@ -1,29 +1,3 @@
-"""Pre-tokenized token shards: the large-corpus dataset format for the ~50M model.
-
-A raw corpus (any format a DatasetReader can stream) is tokenized ONCE into flat binary
-shards of token ids, plus a manifest.json:
-
-    <dataset dir>/
-      manifest.json
-      train/u00000-0000.bin   train/u00000-0001.bin ...
-      val/u00000-0000.bin ...
-      test/u00000-0000.bin ...
-
-* Each .bin is a little-endian uint16 array (uint32 when the vocabulary needs it):
-  documents back to back, each followed by the tokenizer's end-of-text id.
-* Every document goes to train/val/test by a hash of its id (or of its text when the
-  corpus has no ids), with ored.data.training_data.split_of -- the same rule the Supabase
-  snapshots use. A document never crosses splits.
-* Work is split into units, one per source file. A unit's shards are named after it, and
-  .progress.json records finished units, so an interrupted build resumes where it stopped
-  and redoes only the unit it was in. Units can run in parallel (workers > 1).
-* Memory is bounded: documents stream in, tokens stream out in fixed-size buffers.
-* The manifest records every shard's sha256, the tokenizer's identity, every source
-  file's sha256, and a content_sha256 over all of that: the dataset's immutable identity.
-
-Training reads shards through numpy.memmap (TokenWindowDataset), so neither the corpus
-nor its tokens are ever loaded into RAM at once.
-"""
 from __future__ import annotations
 
 import bisect
@@ -69,9 +43,6 @@ def _array_code(dtype: str) -> str:
 def _code_version() -> Dict[str, Any]:
     from ored.data.snapshot import code_version
     return code_version()
-
-
-# -- writing -------------------------------------------------------------------
 
 
 @dataclass
@@ -141,7 +112,6 @@ class _ShardWriter:
 
 @dataclass
 class BuildSettings:
-    """Everything that decides a build's output, so a resumed build cannot mix settings."""
 
     text_field: str
     id_field: Optional[str]
@@ -165,7 +135,6 @@ def _group(doc_id: Optional[str], text: str) -> str:
 def tokenize_unit(unit: int, reader: DatasetReader, tokenizer: Tokenizer, out_dir: Path,
                   settings: BuildSettings, eos_id: int,
                   progress: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
-    """Tokenize one source file into this unit's shards. Returns the unit's record."""
     dtype = dtype_for(tokenizer.vocab_size)
     for stale in out_dir.glob(f"*/u{unit:05d}-*"):
         stale.unlink()
@@ -210,7 +179,6 @@ def _write_json(path: Path, data: Dict[str, Any]) -> None:
 
 
 def content_sha256(manifest: Dict[str, Any]) -> str:
-    """The dataset's identity: everything that decides its tokens, nothing about when or where."""
     identity = {k: manifest[k] for k in ("format", "dataset", "reader", "tokenizer", "dtype",
                                           "eos_id", "split", "max_tokens_per_shard")}
     identity["dataset"] = {k: v for k, v in manifest["dataset"].items() if k != "registry_id"}
@@ -235,11 +203,6 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
                        out_dir: str | Path, settings: BuildSettings, dataset_name: str, dataset_version: str,
                        file_format: Optional[str] = None, workers: int = 1,
                        log: Callable[[str], None] = print) -> Dict[str, Any]:
-    """Tokenize sources (in the given order) into shards + manifest.json. Resumable.
-
-    tokenizer_info is the tokenizer's identity (ored.data.tokenizer_artifact.identity);
-    its sha256 must be this tokenizer's.
-    """
     settings.validate()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -318,9 +281,6 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
     return manifest
 
 
-# -- reading -------------------------------------------------------------------
-
-
 def load_manifest(directory: str | Path) -> Dict[str, Any]:
     path = Path(directory) / MANIFEST
     if not path.is_file():
@@ -339,7 +299,6 @@ def manifest_file_sha256(directory: str | Path) -> str:
 
 def verify_shards(directory: str | Path, manifest: Dict[str, Any], mode: str = "full",
                   splits: Iterable[str] = SPLITS) -> None:
-    """size: every shard exists with the recorded size. full: also its sha256."""
     directory = Path(directory)
     wanted = set(splits)
     itemsize = np.dtype(manifest["dtype"]).itemsize
@@ -360,7 +319,6 @@ def verify_shards(directory: str | Path, manifest: Dict[str, Any], mode: str = "
 
 def dataset_identity(manifest: Dict[str, Any], manifest_sha256: str = "",
                      registry_id: str = "") -> Dict[str, Any]:
-    """What a checkpoint records about the dataset that trained it."""
     dataset = manifest["dataset"]
     return {
         "format": manifest["format"],
@@ -377,12 +335,6 @@ def dataset_identity(manifest: Dict[str, Any], manifest_sha256: str = "",
 
 
 class TokenWindowDataset(Dataset):
-    """Fixed-length training windows over memory-mapped shards.
-
-    Window i is (x, y) = (ids[s : s + block], ids[s + 1 : s + block + 1]) inside one shard;
-    windows never cross shards. Only an int64 offset table per shard is kept in memory.
-    The memmaps are opened lazily, so the dataset pickles cheaply into DataLoader workers.
-    """
 
     def __init__(self, directory: str | Path, manifest: Dict[str, Any], split: str,
                  block_size: int, stride: int) -> None:

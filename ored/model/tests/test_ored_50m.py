@@ -1,9 +1,3 @@
-"""The ~50M model generation: model, tokenizer artifacts, token shards, R2 layout,
-dataset registry rows, the best-only checkpoint and the pretraining loop.
-
-Nothing here touches a real bucket or database: R2 is a local fake S3 server
-(test_r2_store.FakeS3) and the corpora are a few synthetic documents.
-"""
 from __future__ import annotations
 
 import gzip
@@ -101,9 +95,6 @@ def r2():
     server.shutdown()
 
 
-# -- model -------------------------------------------------------------------------
-
-
 def test_50m_parameter_count_is_exact_and_embeddings_tied():
     cfg = load_config(CONFIG_50M)
     model = build_model(cfg, vocab_size=cfg.data.vocab_size)
@@ -175,9 +166,6 @@ def test_gradient_checkpointing_gives_the_same_gradients():
         assert torch.allclose(p.grad, q.grad, atol=1e-5), name
 
 
-# -- tokenizer ---------------------------------------------------------------------------
-
-
 def test_special_token_is_never_produced_from_text(tokenizer):
     eos = tokenizer.special_id(END_OF_TEXT)
     assert eos == tokenizer.vocab_size - 1 == 319
@@ -212,9 +200,6 @@ def test_tampered_artifact_is_refused(artifact):
         load_artifact(artifact)
 
 
-# -- readers ------------------------------------------------------------------------------
-
-
 def test_format_detection_and_inspection_show_fields_not_content(tmp_path):
     gz = write_jsonl(tmp_path / "x.jsonl.gz", synthetic_docs(3), compress=True)
     plain = write_jsonl(tmp_path / "unknown.bin", synthetic_docs(3))
@@ -244,18 +229,15 @@ def test_optional_formats_fail_clearly_without_their_package(tmp_path):
     pq = tmp_path / "x.parquet"
     pq.write_bytes(b"PAR1" + b"\x00" * 16)
     try:
-        import zstandard  # noqa: F401
+        import zstandard
     except ImportError:
         with pytest.raises(ReaderError, match="pip install zstandard"):
             list(open_reader(zst, "body"))
     try:
-        import pyarrow  # noqa: F401
+        import pyarrow
     except ImportError:
         with pytest.raises(ReaderError, match="pip install pyarrow"):
             list(open_reader(pq, "body"))
-
-
-# -- token shards ---------------------------------------------------------------------------
 
 
 def test_shards_manifest_counts_and_windows(shards, tokenizer):
@@ -325,9 +307,6 @@ def test_corrupted_shard_is_detected(shards):
         verify_shards(out, manifest, "full")
 
 
-# -- storage ---------------------------------------------------------------------------
-
-
 ENV = {"ORED_R2_ACCOUNT_ID": "acct123", "ORED_R2_ACCESS_KEY_ID": "AKIA-SECRET-ID",
        "ORED_R2_SECRET_ACCESS_KEY": "very-secret-value", "ORED_R2_BUCKET": "ored-ai-data"}
 
@@ -376,9 +355,6 @@ def test_replace_object_keeps_one_best(r2, tmp_path):
     assert list(FakeS3.objects) == [key] and len(FakeS3.objects[key]) == 250
 
 
-# -- dataset registry ----------------------------------------------------------------------
-
-
 def test_unknown_format_dataset_entry_is_valid_with_nulls():
     entry = DatasetEntry(name="common-pile", version_label="v0.1-1gb", dataset_type="pretraining_corpus",
                          storage_path=ObjectLayout().dataset_dir("common-pile", "v0.1-1gb"),
@@ -405,9 +381,6 @@ def test_registry_entry_refuses_data_and_bad_states():
         DatasetEntry("x", "v1", token_count=-1).to_row()
 
 
-# -- config ----------------------------------------------------------------------------------
-
-
 def test_config_pairs_token_data_with_best_only():
     cfg = load_config(CONFIG_50M)
     assert cfg.data.source == "tokens" and cfg.checkpoint.policy == "best_only"
@@ -418,9 +391,6 @@ def test_config_pairs_token_data_with_best_only():
         load_config(CONFIG_50M, ["checkpoint.keep_history=true"])
     with pytest.raises(ValueError, match="precision"):
         load_config(CONFIG_50M, ["training.precision=int8"])
-
-
-# -- best-only checkpoint ------------------------------------------------------------------------
 
 
 def _payload(epoch, value, tokenizer_sha="t" * 64):
@@ -475,9 +445,6 @@ def test_checkpoint_compatibility_checks(tmp_path):
     torch.save({"format_version": 2, "model_state_dict": {}}, tmp_path / "best.pt")
     with pytest.raises(BestCheckpointError, match="older Ored model"):
         BestCheckpoint(tmp_path).load()
-
-
-# -- pretraining loop -------------------------------------------------------------------------------
 
 
 def tiny_cfg(tmp_path, out, artifact, **extra):

@@ -123,7 +123,7 @@ ored-ai/tokenizers/<name>/<version>/tokenizer.json
 ored-ai/checkpoints/<run_name>/best.pt
 ```
 
-Environment variables (see `.env.example`; never commit values):
+Environment variables (never commit values):
 `ORED_R2_ACCOUNT_ID` (or `ORED_R2_ENDPOINT`), `ORED_R2_ACCESS_KEY_ID`,
 `ORED_R2_SECRET_ACCESS_KEY`, `ORED_R2_BUCKET`, optional `ORED_R2_PREFIX`. The client is the
 repository's existing signed S3 client (`ored.learning.r2.R2Store`, no new dependency);

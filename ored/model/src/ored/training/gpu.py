@@ -1,16 +1,3 @@
-"""Device setup for the pretraining loop: precision, matmul backends, memory reporting.
-
-Choices, and why:
-* precision "auto": bf16 autocast when the GPU supports it (Ampere and newer, which
-  includes the RTX 50 series), else fp16 autocast with a GradScaler, else fp32 on CPU.
-  bf16 has fp32's exponent range, so it needs no loss scaling; the scaler is created
-  only for fp16.
-* tf32: lets the fp32 matmuls that remain under autocast use tensor cores
-  (torch.set_float32_matmul_precision("high")). Opt-in per config.
-* cudnn.benchmark is left alone: it tunes convolution kernels and this model has none.
-* Attention kernels are chosen by torch's scaled_dot_product_attention (model.attention:
-  sdpa): flash attention for bf16/fp16 on supported GPUs, memory-efficient otherwise.
-"""
 from __future__ import annotations
 
 import contextlib

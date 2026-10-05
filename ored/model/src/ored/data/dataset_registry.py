@@ -1,14 +1,3 @@
-"""Registry rows for externally stored datasets (public.ored_datasets, source = 'external').
-
-Supabase holds only metadata about a dataset; its files live in R2. A dataset whose file
-format is not known yet can still be registered: everything about the file is nullable,
-and anything variable goes into the manifest / metadata JSON objects -- never the data.
-
-Lifecycle (status): registered -> uploading -> uploaded -> processing -> ready, or failed /
-deprecated. Once ready (which requires a sha256), the row's identity -- name, version,
-storage location, file description, sha256, manifest -- is frozen by a database trigger.
-See ored/supabase/migrations/20261005120000_ored_dataset_registry.sql.
-"""
 from __future__ import annotations
 
 import json

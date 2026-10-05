@@ -1,19 +1,3 @@
-"""Pretraining loop for the ~50M Ored model (configs/ored_50m.yaml, data.source: tokens).
-
-Separate from ored.training.trainer.Trainer on purpose: the existing ~5M model keeps its
-loop, its Supabase snapshots and its base/live/best/history checkpoints unchanged. This
-loop is built for a large pre-tokenized corpus on one 8 GB GPU:
-
-* data: memory-mapped token shards (ored.data.token_shards), DataLoader workers,
-  pinned memory and non-blocking copies; nothing is tokenized during training.
-* compute: bf16/fp16 autocast (GradScaler only for fp16), SDPA attention, optional
-  gradient checkpointing, optional torch.compile, optional TF32, fused AdamW on CUDA.
-* batches: micro-batch data.batch_size, gradient accumulation to
-  training.grad_accum_steps; the loss is synchronised only when it is logged.
-* checkpoints: best.pt only (ored.training.best_checkpoint), optionally replaced in R2
-  at <prefix>/checkpoints/<run_name>/best.pt. Nothing goes to Supabase.
-* CUDA out-of-memory stops the run with the numbers needed to fix it.
-"""
 from __future__ import annotations
 
 import argparse
@@ -119,7 +103,6 @@ def prepare_token_data(cfg: Config) -> PretrainData:
 
 
 def build_adamw(model: nn.Module, cfg: Config, device: torch.device) -> torch.optim.Optimizer:
-    """AdamW with weight decay on matrices only (not on biases or LayerNorm gains)."""
     if cfg.training.optimizer.lower() != "adamw":
         raise PretrainError("the pretraining loop uses training.optimizer: adamw")
     decay = [p for p in model.parameters() if p.requires_grad and p.dim() >= 2]
@@ -195,7 +178,6 @@ class PretrainTrainer:
         elif cfg.training.resume:
             raise PretrainError("this model resumes only from its own best.pt: training.resume=best")
 
-    # -- setup -----------------------------------------------------------------
 
     def _loader(self, dataset: TokenWindowDataset, shuffle: bool) -> DataLoader:
         cfg = self.cfg.data
@@ -226,7 +208,6 @@ class PretrainTrainer:
         logger.info(f"resumed from {self.best.path} (epoch {payload['epoch']}, step {self.global_step:,}, "
                     f"best val_loss {self.best.best_value:.4f})")
 
-    # -- one step ----------------------------------------------------------------
 
     def _loss(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         with self.precision.autocast(self.device):
@@ -313,7 +294,6 @@ class PretrainTrainer:
             examples += x.size(0)
         return (total / max(examples, 1)).item()
 
-    # -- checkpoint ------------------------------------------------------------------
 
     def payload(self, epoch: int, record: Dict[str, Any]) -> Dict[str, Any]:
         t = self.cfg.training
@@ -348,11 +328,10 @@ class PretrainTrainer:
         try:
             replace_object(self.store, self.best.path, self.r2_object)
             logger.info(f"  best.pt replaced in R2 at {self.r2_object}")
-        except Exception as exc:  # the local best.pt is safe; the run goes on
+        except Exception as exc:
             self.upload_errors.append(f"{self.r2_object}: {exc}")
             logger.error(f"  R2 upload of best.pt failed (local best.pt kept): {exc}")
 
-    # -- loop ------------------------------------------------------------------------
 
     def _oom(self, exc: BaseException) -> TrainingOOMError:
         cfg = self.cfg
@@ -464,8 +443,6 @@ class PretrainTrainer:
 
 def probe_batch_sizes(cfg: Config, candidates: Sequence[int] = (1, 2, 4, 6, 8, 12, 16, 24, 32),
                       steps: int = 2) -> List[Dict[str, Any]]:
-    """Try micro-batch sizes on the GPU (random tokens, full forward/backward/step) and
-    report peak memory for each, stopping at the first out-of-memory."""
     device = resolve_device(cfg.training.device)
     if device.type != "cuda":
         raise PretrainError("--probe-batch-size measures GPU memory; it needs a CUDA device")

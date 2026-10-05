@@ -1,17 +1,3 @@
-"""Versioned tokenizer artifacts.
-
-The original language model rebuilds its tokenizer from train.txt on every run and keeps
-it inside each checkpoint. A model trained on a large corpus needs the opposite: the
-tokenizer is trained once, saved as a named, versioned file, and every dataset shard and
-checkpoint records which one it is by sha256. This module is that file format.
-
-    {"format": "ored-tokenizer/1", "name": "ored-bpe-16k", "version": "v1",
-     "sha256": "<sha256 of the canonical tokenizer JSON>", "created_at": "...",
-     "training": {...free-form provenance...}, "tokenizer": {...Tokenizer.to_dict()...}}
-
-The sha256 is the same digest ored.data.snapshot.tokenizer_digest computes, so an
-artifact and a snapshot manifest agree on a tokenizer's identity.
-"""
 from __future__ import annotations
 
 import hashlib
@@ -38,7 +24,6 @@ def tokenizer_sha256(tokenizer: Tokenizer | Dict[str, Any]) -> str:
 
 
 def identity(tokenizer: Tokenizer, name: str = "", version: str = "") -> Dict[str, Any]:
-    """What a checkpoint or a shard manifest records about its tokenizer."""
     data = tokenizer.to_dict()
     return {
         "format": ARTIFACT_FORMAT,
@@ -77,7 +62,6 @@ def save_artifact(tokenizer: Tokenizer, path: str | Path, name: str, version: st
 
 
 def load_artifact(path: str | Path, expected_sha256: str = "") -> Tuple[Tokenizer, Dict[str, Any]]:
-    """Load and verify an artifact. Refuses a file whose content does not match its hash."""
     path = Path(path)
     try:
         artifact = json.loads(path.read_text(encoding="utf-8"))

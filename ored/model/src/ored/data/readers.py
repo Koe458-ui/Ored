@@ -1,18 +1,3 @@
-"""Readers that stream documents out of raw corpus files.
-
-The real corpus's format is not known yet, so nothing here assumes field names: a reader
-is told which field holds the text (and, optionally, the document id). inspect_file()
-looks at an unknown file -- format, compression, and the field names of its first records
--- without reading it all, so the right reader and fields can be chosen once the file
-arrives.
-
-    DatasetReader            iter_documents() -> Document(id, text, metadata), in file order
-    ├── JsonlReader          .jsonl, .jsonl.gz (stdlib), .jsonl.zst (needs `zstandard`)
-    └── ParquetReader        .parquet (needs `pyarrow`)
-
-Every reader yields documents one at a time in a fixed order; memory does not grow
-with the file size.
-"""
 from __future__ import annotations
 
 import gzip
@@ -52,7 +37,6 @@ class FileFormat:
 
 
 def detect_format(path: str | Path) -> FileFormat:
-    """Format from the file's magic bytes first, then its name. Unknown stays None."""
     path = Path(path)
     with open(path, "rb") as handle:
         head = handle.read(4)
@@ -87,7 +71,6 @@ def _open_binary(path: Path, compression: Optional[str]) -> BinaryIO:
 
 
 class DatasetReader:
-    """Base class. Subclasses implement _records(); this turns records into Documents."""
 
     def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
                  metadata_fields: Sequence[str] = ()) -> None:
@@ -119,7 +102,6 @@ class DatasetReader:
 
 
 def _field(record: Dict[str, Any], dotted: Optional[str]) -> Any:
-    """Look up a field; 'a.b' reaches into a nested object."""
     value: Any = record
     for part in (dotted or "").split("."):
         if not isinstance(value, dict) or part not in value:
@@ -129,7 +111,6 @@ def _field(record: Dict[str, Any], dotted: Optional[str]) -> Any:
 
 
 class JsonlReader(DatasetReader):
-    """One JSON object per line, optionally gzip- or zstd-compressed."""
 
     def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
                  metadata_fields: Sequence[str] = (), compression: Optional[str] = "detect") -> None:
@@ -151,7 +132,6 @@ class JsonlReader(DatasetReader):
 
 
 class ParquetReader(DatasetReader):
-    """Row groups are read in batches, so memory stays at one batch."""
 
     def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
                  metadata_fields: Sequence[str] = (), batch_size: int = 1024) -> None:
@@ -197,11 +177,6 @@ def file_sha256(path: str | Path, chunk: int = 4 * 1024 * 1024) -> str:
 
 
 def inspect_file(path: str | Path, max_records: int = 5) -> Dict[str, Any]:
-    """Describe an unknown file without reading it all or printing its content.
-
-    Reports the detected format and compression, its size, and the field names (with
-    value types) of the first few records -- enough to choose text_field and id_field.
-    """
     path = Path(path)
     detected = detect_format(path)
     report: Dict[str, Any] = {"file_name": path.name, "size_bytes": path.stat().st_size,

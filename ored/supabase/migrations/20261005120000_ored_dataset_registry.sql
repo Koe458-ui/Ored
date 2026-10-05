@@ -1,31 +1,3 @@
--- Ored dataset registry for externally stored corpora (Cloudflare R2).
---
--- Builds on 20260926120000_ored_training_data.sql. public.ored_datasets already is the
--- dataset registry (generated corpora and Supabase snapshots), so this extends it rather
--- than creating a second registry. See ored/model/docs/ored-50m.md.
---
---   1. New nullable metadata columns describing a dataset whose files live in R2 and whose
---      format may not be known yet: version_label, dataset_type, status, storage_provider,
---      storage_bucket, file_name, file_format, compression, external_id, source_id,
---      size_bytes, document_count, token_count, manifest (jsonb), metadata (jsonb).
---   2. source gains 'external' (files outside Postgres). Existing values are unchanged.
---   3. Constraints keep the JSON columns small objects (metadata, never the data itself),
---      and a dataset can only be 'ready' with a sha256.
---   4. ored_datasets_guard additionally freezes an external dataset's identity once it is
---      ready; ored_datasets now keeps updated_at current.
---   5. ored_dataset_register_external(jsonb): registers a dataset under (name,
---      version_label), giving it the next integer version; idempotent.
---
--- Existing rows keep every value they have. They receive status = 'ready' (they are
--- usable today) and null / '{}' for the other new columns. No row is updated by this
--- migration: the new columns are filled by their defaults.
---
--- Security: unchanged model. RLS stays enabled and forced with no policy (only
--- service_role, which bypasses RLS, reaches the table); anon and authenticated keep no
--- privileges; the new function is executable by service_role only.
-
--- 1. columns -------------------------------------------------------------------
-
 alter table public.ored_datasets
   add column version_label text,
   add column dataset_type text,
@@ -43,35 +15,7 @@ alter table public.ored_datasets
   add column manifest jsonb not null default '{}'::jsonb,
   add column metadata jsonb not null default '{}'::jsonb;
 
--- Existing rows got 'ready' above; rows registered from now on start as 'registered'.
 alter table public.ored_datasets alter column status set default 'registered';
-
-comment on column public.ored_datasets.version_label is
-  'Human version of an external dataset, e.g. v0.1-1gb. version stays the integer sequence.';
-comment on column public.ored_datasets.dataset_type is
-  'What the dataset is for, e.g. pretraining_corpus. Free-form slug.';
-comment on column public.ored_datasets.status is
-  'registered -> uploading -> uploaded -> processing -> ready, or failed / deprecated.';
-comment on column public.ored_datasets.storage_provider is
-  'Where the files are: r2 (the default for large datasets), supabase_storage or local.';
-comment on column public.ored_datasets.storage_bucket is 'Bucket holding the files.';
-comment on column public.ored_datasets.file_name is 'The main file''s name, once known.';
-comment on column public.ored_datasets.file_format is 'e.g. jsonl or parquet; null until known.';
-comment on column public.ored_datasets.compression is 'e.g. gzip or zstd; null when none or unknown.';
-comment on column public.ored_datasets.external_id is 'The dataset''s id at its source, when it has one.';
-comment on column public.ored_datasets.source_id is 'The upstream source / collection id, when it has one.';
-comment on column public.ored_datasets.size_bytes is 'Size of the stored file(s) in bytes; null until known.';
-comment on column public.ored_datasets.document_count is 'Documents in the dataset; null until counted.';
-comment on column public.ored_datasets.token_count is 'Tokens under the recorded tokenizer; null until counted.';
-comment on column public.ored_datasets.manifest is
-  'The dataset''s manifest (files, checksums, splits, tokenizer). Metadata only, at most 1 MiB.';
-comment on column public.ored_datasets.metadata is
-  'Free-form metadata (licence, provenance, notes). Never the dataset content; at most 256 KiB.';
-comment on column public.ored_datasets.source is
-  'generated = produced by a generator script; supabase = a snapshot of ored_training_data; '
-  'external = files stored outside Postgres (R2), registered here as metadata only.';
-
--- 2. constraints -----------------------------------------------------------------
 
 alter table public.ored_datasets drop constraint ored_datasets_source_check;
 alter table public.ored_datasets
@@ -119,8 +63,6 @@ create unique index ored_datasets_external_object_idx
   where source = 'external' and storage_path is not null;
 
 create index ored_datasets_status_idx on public.ored_datasets (status);
-
--- 3. guard and updated_at -----------------------------------------------------------
 
 create or replace function public.ored_datasets_guard()
 returns trigger
@@ -187,15 +129,10 @@ begin
 end;
 $$;
 
--- Runs after ored_datasets_guard (triggers fire in name order).
 create trigger ored_datasets_touch
   before update on public.ored_datasets
   for each row execute function public.ored_datasets_touch();
 
--- 4. register ----------------------------------------------------------------------
-
--- Unchanged from 20260926120000 except that a new snapshot is inserted as status 'ready'
--- (a snapshot is complete when it is registered; the column default is now 'registered').
 create or replace function public.ored_dataset_register(p_row jsonb)
 returns public.ored_datasets
 language plpgsql
@@ -294,12 +231,6 @@ begin
   return stored;
 end;
 $$;
-
-comment on function public.ored_dataset_register_external(jsonb) is
-  'Register an R2-stored dataset (metadata only) under (name, version_label); returns the '
-  'existing row when it is already registered.';
-
--- 5. privileges ----------------------------------------------------------------------
 
 alter table public.ored_datasets enable row level security;
 alter table public.ored_datasets force row level security;

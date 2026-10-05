@@ -16,15 +16,6 @@ ATTENTION_IMPLEMENTATIONS = ("manual", "sdpa")
 
 
 class CausalSelfAttention(nn.Module):
-    """Multi-head causal self-attention.
-
-    attention="manual" builds the T x T score matrix explicitly (the original Ored
-    implementation, kept as the default so existing runs reproduce exactly).
-    attention="sdpa" calls torch's scaled_dot_product_attention with is_causal=True,
-    which picks a flash / memory-efficient kernel on CUDA when the dtype and shapes
-    allow and never materialises the score matrix in Python. Both compute the same
-    function; their parameters and state dicts are identical.
-    """
 
     def __init__(self, d_model: int, n_head: int, block_size: int, dropout: float = 0.0,
                  attention: str = "manual") -> None:
@@ -187,8 +178,6 @@ class Transformer(OredModel):
 
         for block in self.blocks:
             if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
-                # Recompute the block's activations in the backward pass instead of keeping
-                # them: less memory, about one extra forward pass of compute.
                 x = checkpoint(block, x, use_reentrant=False)
             else:
                 x = block(x)
@@ -218,9 +207,6 @@ class Transformer(OredModel):
         return self.head.weight is self.token_embedding.weight
 
     def describe(self) -> Dict[str, Any]:
-        # The architecture record compared by checkpoint compatibility checks. attention and
-        # gradient_checkpointing are left out on purpose: they change how the same function
-        # is computed, not the parameters, so a checkpoint loads under either setting.
         return {
             "type": "Transformer",
             "vocab_size": self.vocab_size,

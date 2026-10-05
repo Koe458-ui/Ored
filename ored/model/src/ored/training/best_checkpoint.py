@@ -1,15 +1,3 @@
-"""The best-only checkpoint policy: one file, best.pt, replaced only by a better epoch.
-
-* An epoch whose validation metric does not beat the best saves nothing.
-* A better epoch writes best.pt.tmp-<pid>, fsyncs it, loads it back and checks it, and
-  only then os.replace()s it over best.pt -- an atomic rename on the same filesystem. A
-  crash or a bad write at any point leaves the previous best.pt untouched.
-* No history, no per-epoch files, no backup copies. Leftover temporaries from a crashed
-  save are removed at start.
-
-The payload is self-describing (schema, model version, architecture, tokenizer and
-dataset identity) and check_compatible() refuses to load it into the wrong model.
-"""
 from __future__ import annotations
 
 import gc
@@ -58,7 +46,6 @@ class BestCheckpoint:
         return value < self.best_value if self.mode == "min" else value > self.best_value
 
     def consider(self, value: float, make_payload: Callable[[], Dict[str, Any]]) -> bool:
-        """Save make_payload() as best.pt when value beats the best so far."""
         if not self.is_better(value):
             return False
         self.save(make_payload())
@@ -113,7 +100,6 @@ class BestCheckpoint:
 def check_compatible(payload: Dict[str, Any], *, model_version: str, architecture: Dict[str, Any],
                      tokenizer_sha256: str, dataset_sha256: Optional[str] = None,
                      path: str | Path = FILENAME) -> None:
-    """Refuse a checkpoint from another model version, architecture, tokenizer or dataset."""
     problems = []
     if payload.get("schema") != CHECKPOINT_SCHEMA:
         problems.append(f"schema {payload.get('schema')!r}, expected {CHECKPOINT_SCHEMA}")

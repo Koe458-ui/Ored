@@ -1,27 +1,3 @@
-"""scripts/corpus.py -- get a large raw corpus ready for the ~50M model.
-
-Every step is explicit; nothing runs on import and nothing is uploaded unless asked.
-
-  inspect FILE                         format, compression, size and field names of an
-                                       unknown file (prints no document content)
-  train-tokenizer --input F ...        train a byte-level BPE tokenizer artifact
-  build-shards --input F ...           tokenize into resumable uint16 shards + manifest
-  layout --name N --version V          print the R2 object paths for a dataset
-  registry-row --name N --version-label V [--file F]
-                                       print the ored_datasets row (metadata only)
-  register ...                         send that row to Supabase (needs ORED_SB_* env)
-  update-registry --name N --version-label V --set key=value ...
-                                       fill in status / counts / sha256 later (ORED_SB_*);
-                                       manifest=@file.json reads JSON from a file
-  upload-raw --file F --name N --version V
-                                       upload one raw file to the dataset folder in R2
-  publish --dir D --name N --version V upload finished shards to R2 (needs ORED_R2_* env)
-  fetch --name N --version V --tokenizer-label L --out D
-                                       download shards from R2 and verify them
-
-The text and id fields are always passed explicitly (--text-field / --id-field): the
-corpus's schema is not assumed anywhere.
-"""
 from __future__ import annotations
 
 import argparse

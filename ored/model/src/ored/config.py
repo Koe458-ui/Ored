@@ -89,12 +89,6 @@ class SupabaseDataConfig:
 
 @dataclass
 class TokenDataConfig:
-    """A pre-tokenized dataset (token shards + manifest.json), used by data.source: tokens.
-
-    The shards live in R2 under datasets/<dataset_name>/<dataset_version>/ and are
-    cached in cache_dir. Nothing here names a file format: the raw corpus is turned
-    into shards by scripts/corpus.py once its format is known.
-    """
 
     manifest: str = ""
 

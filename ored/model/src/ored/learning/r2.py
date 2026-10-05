@@ -155,8 +155,6 @@ class R2Store(CheckpointStore):
         return {"object_path": object_path, "size_bytes": size, "sha256": digest(path)}
 
     def download(self, object_path: str, path: str | Path) -> Path:
-        """Stream the object to disk in chunks (a dataset shard or checkpoint never has to
-        fit in memory), then move it into place."""
         path = Path(path)
         key = self._key_url(object_path)
         signed = self._signed_headers("GET", key, [], hashlib.sha256(b"").hexdigest(), {})

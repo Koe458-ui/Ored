@@ -1,9 +1,3 @@
-"""Moving the layout's files between local disk and R2.
-
-All functions take a store with the ored.learning.r2.R2Store interface
-(upload / download / stat / list_objects), so tests use a fake S3 server and nothing
-here talks to a real bucket unless the caller passes one.
-"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,11 +9,6 @@ from ored.learning.store import StoreError
 
 
 def replace_object(store: Any, path: str | Path, object_path: str) -> Dict[str, Any]:
-    """Upload a file over an existing object (e.g. checkpoints/<model>/best.pt).
-
-    An S3 PUT replaces an object only once the new one is complete, so a failed upload
-    leaves the previous object in place. The size is checked afterwards.
-    """
     path = Path(path)
     size = path.stat().st_size
     store.upload(path, object_path, upsert=True)
@@ -31,8 +20,6 @@ def replace_object(store: Any, path: str | Path, object_path: str) -> Dict[str, 
 
 def publish_token_dataset(store: Any, local_dir: str | Path, object_dir: str,
                           log: Callable[[str], None] = print) -> Dict[str, Any]:
-    """Upload a finished shard directory; the manifest goes last, so a reader never sees a
-    manifest whose shards are not all there. Existing objects are never overwritten."""
     local_dir = Path(local_dir)
     manifest = load_manifest(local_dir)
     verify_shards(local_dir, manifest, "full")
@@ -52,8 +39,6 @@ def publish_token_dataset(store: Any, local_dir: str | Path, object_dir: str,
 
 def fetch_token_dataset(store: Any, object_dir: str, local_dir: str | Path, verify: str = "full",
                         log: Callable[[str], None] = print) -> Dict[str, Any]:
-    """Download a shard directory into a local cache, skipping shards already present and
-    intact, and verify every shard against the manifest."""
     local_dir = Path(local_dir)
     local_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = local_dir / MANIFEST

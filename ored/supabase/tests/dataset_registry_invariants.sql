@@ -1,13 +1,3 @@
--- Invariant checks for the external-dataset registry added by
--- 20261005120000_ored_dataset_registry.sql.
---
--- Everything runs in one transaction that is rolled back, so it is safe to run against
--- the real project:
---
---   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f ored/supabase/tests/dataset_registry_invariants.sql
---
--- It uses its own dataset names (invariant_test_*). No dataset content is stored.
-
 begin;
 
 create function pg_temp.expect_error(statement text, fragment text)
@@ -24,8 +14,6 @@ begin
   raise exception 'expected this to fail, it succeeded: %', statement;
 end;
 $$;
-
--- 1. shape -----------------------------------------------------------------------
 
 do $$
 declare
@@ -60,8 +48,6 @@ begin
   end if;
 end $$;
 
--- 2. security --------------------------------------------------------------------
-
 do $$
 declare
   r record;
@@ -94,7 +80,6 @@ begin
   end if;
 end $$;
 
--- anon and authenticated really are refused (grants, not just policies).
 set local role anon;
 select pg_temp.expect_error('select count(*) from public.ored_datasets', 'permission denied');
 select pg_temp.expect_error($q$insert into public.ored_datasets (name, kind) values ('x', 'text')$q$,
@@ -105,8 +90,6 @@ select pg_temp.expect_error('select count(*) from public.ored_datasets', 'permis
 select pg_temp.expect_error($q$select public.ored_dataset_register_external('{"name": "x", "version_label": "v1"}')$q$,
                             'permission denied');
 reset role;
-
--- 3. an unknown-format dataset, registered without any data -----------------------
 
 set local role service_role;
 
@@ -149,13 +132,11 @@ begin
   end if;
 end $$;
 
--- the same object cannot be registered twice
 select pg_temp.expect_error($q$select public.ored_dataset_register_external(jsonb_build_object(
   'name', 'invariant_test_other', 'version_label', 'v1', 'storage_provider', 'r2',
   'storage_bucket', 'ored-ai-test', 'storage_path', 'ored-ai/datasets/invariant_test_corpus/v0.1-1gb'))$q$,
   'ored_datasets_external_object_idx');
 
--- metadata only: a large manifest is refused
 select pg_temp.expect_error($q$update public.ored_datasets
   set manifest = jsonb_build_object('text', repeat(md5(random()::text), 70000))
   where name = 'invariant_test_corpus' and version_label = 'v0.2'$q$, 'ored_datasets_manifest_check');
@@ -168,8 +149,6 @@ select pg_temp.expect_error($q$update public.ored_datasets set storage_path = '.
 select pg_temp.expect_error($q$update public.ored_datasets set status = 'bogus'
   where name = 'invariant_test_corpus' and version_label = 'v0.2'$q$, 'ored_datasets_status_check');
 
--- 4. lifecycle: filled in later, frozen once ready -------------------------------
-
 select pg_temp.expect_error($q$update public.ored_datasets set status = 'ready'
   where name = 'invariant_test_corpus' and version_label = 'v0.1-1gb'$q$, 'ored_datasets_ready_check');
 
@@ -177,7 +156,6 @@ do $$
 declare
   row public.ored_datasets;
 begin
-  -- updated_at is maintained by the trigger, whatever the statement sets.
   update public.ored_datasets set updated_at = '2000-01-01'
    where name = 'invariant_test_corpus' and version_label = 'v0.1-1gb'
   returning * into row;
@@ -213,8 +191,6 @@ select pg_temp.expect_error($q$select public.ored_dataset_register_external(json
 
 update public.ored_datasets set status = 'deprecated'
  where name = 'invariant_test_corpus' and version_label = 'v0.1-1gb';
-
--- 5. snapshots still work and are registered ready ---------------------------------
 
 do $$
 declare

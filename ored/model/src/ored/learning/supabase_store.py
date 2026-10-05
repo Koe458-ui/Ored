@@ -148,9 +148,6 @@ class SupabaseStore:
         return self._build(Dataset, returned)
 
     def register_external_dataset(self, entry: Any) -> Dict[str, Any]:
-        """Register (or find, by name + version_label) an R2-stored dataset in ored_datasets.
-
-        entry is an ored.data.dataset_registry.DatasetEntry; only metadata is sent."""
         returned = self._call("POST", "/rpc/ored_dataset_register_external", {"p_row": entry.to_row()})
         if isinstance(returned, list):
             returned = returned[0] if returned else None
@@ -166,8 +163,6 @@ class SupabaseStore:
         return found[0] if found else None
 
     def update_external_dataset(self, dataset_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
-        """Fill in what becomes known later (status, counts, sha256, manifest). The database
-        freezes a dataset's identity once its status is ready."""
         allowed = {"status", "storage_provider", "storage_bucket", "storage_path", "file_name", "file_format",
                    "compression", "external_id", "source_id", "size_bytes", "document_count", "token_count",
                    "sha256", "manifest", "metadata", "summary", "dataset_type"}

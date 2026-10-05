@@ -157,13 +157,6 @@ def _to_symbols(word: str) -> str:
 
 @register_tokenizer("subword")
 class SubwordTokenizer(Tokenizer):
-    """Byte-level BPE: 256 byte tokens, then merges, then optional special tokens.
-
-    Special tokens (e.g. END_OF_TEXT) take the last ids. encode() never produces them
-    from text -- the literal string "<|endoftext|>" in a document is encoded as bytes --
-    so a document boundary can only come from special_id(). A tokenizer without special
-    tokens serialises exactly as before, so existing tokenizer hashes are unchanged.
-    """
 
     def __init__(self, merges: Sequence[Tuple[str, str]] = (), seen_bytes: Iterable[int] = range(256),
                  special_tokens: Sequence[str] = ()) -> None:
@@ -194,8 +187,6 @@ class SubwordTokenizer(Tokenizer):
     @classmethod
     def from_word_counts(cls, words: Counter, seen_bytes: Iterable[int], vocab_size: int,
                          special_tokens: Sequence[str] = ()) -> "SubwordTokenizer":
-        """Learn merges from counts of pre-tokenized words (see count_words), so a large
-        corpus can be streamed: memory grows with the number of distinct words, not bytes."""
         n_merges = vocab_size - len(BASE_TOKENS) - len(special_tokens)
         if n_merges < 0:
             raise ValueError(f"vocab_size {vocab_size} leaves no room for 256 bytes + "
@@ -284,7 +275,6 @@ class SubwordTokenizer(Tokenizer):
 
 
 def count_words(texts: Iterable[str]) -> Tuple[Counter, set]:
-    """Pre-tokenize a stream of documents into word counts and the set of bytes seen."""
     words: Counter = Counter()
     seen = {ord("\n")}
     for text in texts:

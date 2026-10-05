@@ -1,14 +1,3 @@
-"""The versioned object layout in the R2 bucket.
-
-    ored-ai/
-      datasets/<dataset-name>/<version>/manifest.json         (raw-file or token-shard manifest)
-      datasets/<dataset-name>/<version>/<file>                (raw files, e.g. the source corpus)
-      datasets/<dataset-name>/<version>/tokens/<tokenizer>/   (token shards + their manifest)
-      tokenizers/<tokenizer-name>/<version>/tokenizer.json
-      checkpoints/<model>/best.pt                             (the only checkpoint object per model)
-
-Every segment is checked, so a name can never climb out of its folder.
-"""
 from __future__ import annotations
 
 import re
