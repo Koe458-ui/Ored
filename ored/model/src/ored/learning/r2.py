@@ -4,6 +4,7 @@ import datetime as dt
 import hashlib
 import hmac
 import os
+import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +23,7 @@ from ored.learning.store import StoreError
 
 # One PUT to R2 takes at most 5 GiB; bigger files would need a multipart upload.
 MAX_PUT_BYTES = 5 * 1024 * 1024 * 1024
+DOWNLOAD_CHUNK = 4 * 1024 * 1024
 REGION = "auto"
 SERVICE = "s3"
 S3_NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
@@ -153,13 +155,26 @@ class R2Store(CheckpointStore):
         return {"object_path": object_path, "size_bytes": size, "sha256": digest(path)}
 
     def download(self, object_path: str, path: str | Path) -> Path:
+        """Stream the object to disk in chunks (a dataset shard or checkpoint never has to
+        fit in memory), then move it into place."""
         path = Path(path)
-        status, _, body = self._request("GET", self._key_url(object_path))
-        if status == 404:
-            raise StoreError(f"GET r2://{self.bucket}/{object_path} -> 404 not found")
+        key = self._key_url(object_path)
+        signed = self._signed_headers("GET", key, [], hashlib.sha256(b"").hexdigest(), {})
+        request = urllib.request.Request(self.endpoint + key, method="GET", headers=signed)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".part")
-        tmp.write_bytes(body)
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response, open(tmp, "wb") as out:
+                shutil.copyfileobj(response, out, DOWNLOAD_CHUNK)
+        except urllib.error.HTTPError as exc:
+            tmp.unlink(missing_ok=True)
+            if exc.code == 404:
+                raise StoreError(f"GET r2://{self.bucket}/{object_path} -> 404 not found") from exc
+            detail = exc.read().decode("utf-8", "replace")[:300]
+            raise StoreError(f"GET r2://{self.bucket}/{object_path} -> {exc.code} {detail}") from exc
+        except urllib.error.URLError as exc:
+            tmp.unlink(missing_ok=True)
+            raise StoreError(f"GET {self.endpoint} could not be reached: {exc.reason}") from exc
         tmp.replace(path)
         return path
 

@@ -6,17 +6,35 @@ from typing import Any, Dict, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 
 from ored.models.base import OredModel
 from ored.models.registry import register_model
 
 
-class CausalSelfAttention(nn.Module):
+ATTENTION_IMPLEMENTATIONS = ("manual", "sdpa")
 
-    def __init__(self, d_model: int, n_head: int, block_size: int, dropout: float = 0.0) -> None:
+
+class CausalSelfAttention(nn.Module):
+    """Multi-head causal self-attention.
+
+    attention="manual" builds the T x T score matrix explicitly (the original Ored
+    implementation, kept as the default so existing runs reproduce exactly).
+    attention="sdpa" calls torch's scaled_dot_product_attention with is_causal=True,
+    which picks a flash / memory-efficient kernel on CUDA when the dtype and shapes
+    allow and never materialises the score matrix in Python. Both compute the same
+    function; their parameters and state dicts are identical.
+    """
+
+    def __init__(self, d_model: int, n_head: int, block_size: int, dropout: float = 0.0,
+                 attention: str = "manual") -> None:
         super().__init__()
         if d_model % n_head != 0:
             raise ValueError(f"d_model ({d_model}) must be divisible by n_head ({n_head})")
+        if attention not in ATTENTION_IMPLEMENTATIONS:
+            raise ValueError(f"attention must be one of {ATTENTION_IMPLEMENTATIONS}, got {attention!r}")
+        self.attention = attention
+        self.dropout = dropout
 
         self.d_model = d_model
         self.n_head = n_head
@@ -29,11 +47,12 @@ class CausalSelfAttention(nn.Module):
         self.attn_dropout = nn.Dropout(dropout)
         self.residual_dropout = nn.Dropout(dropout)
 
-        self.register_buffer(
-            "causal_mask",
-            torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
-            persistent=False,
-        )
+        if attention == "manual":
+            self.register_buffer(
+                "causal_mask",
+                torch.tril(torch.ones(block_size, block_size)).view(1, 1, block_size, block_size),
+                persistent=False,
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, T, C = x.shape
@@ -43,6 +62,12 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, self.d_head).transpose(1, 2)
         k = k.view(B, T, self.n_head, self.d_head).transpose(1, 2)
         v = v.view(B, T, self.n_head, self.d_head).transpose(1, 2)
+
+        if self.attention == "sdpa":
+            out = F.scaled_dot_product_attention(
+                q, k, v, dropout_p=self.dropout if self.training else 0.0, is_causal=True)
+            out = out.transpose(1, 2).contiguous().view(B, T, C)
+            return self.residual_dropout(self.projection(out))
 
         scores = (q @ k.transpose(-2, -1)) / math.sqrt(self.d_head)
 
@@ -76,10 +101,10 @@ class FeedForward(nn.Module):
 class TransformerBlock(nn.Module):
 
     def __init__(self, d_model: int, n_head: int, d_ff: int, block_size: int,
-                 dropout: float = 0.0) -> None:
+                 dropout: float = 0.0, attention: str = "manual") -> None:
         super().__init__()
         self.ln_1 = nn.LayerNorm(d_model)
-        self.attention = CausalSelfAttention(d_model, n_head, block_size, dropout)
+        self.attention = CausalSelfAttention(d_model, n_head, block_size, dropout, attention)
         self.ln_2 = nn.LayerNorm(d_model)
         self.feed_forward = FeedForward(d_model, d_ff, dropout)
 
@@ -102,6 +127,8 @@ class Transformer(OredModel):
         d_ff: int = 512,
         dropout: float = 0.1,
         tie_weights: bool = True,
+        attention: str = "manual",
+        gradient_checkpointing: bool = False,
     ) -> None:
         super().__init__()
 
@@ -111,6 +138,8 @@ class Transformer(OredModel):
         self.n_layer = n_layer
         self.n_head = n_head
         self.d_ff = d_ff
+        self.attention = attention
+        self.gradient_checkpointing = gradient_checkpointing
 
         self.token_embedding = nn.Embedding(vocab_size, d_model)
 
@@ -118,7 +147,7 @@ class Transformer(OredModel):
 
         self.dropout = nn.Dropout(dropout)
         self.blocks = nn.ModuleList([
-            TransformerBlock(d_model, n_head, d_ff, block_size, dropout)
+            TransformerBlock(d_model, n_head, d_ff, block_size, dropout, attention)
             for _ in range(n_layer)
         ])
         self.ln_final = nn.LayerNorm(d_model)
@@ -157,7 +186,12 @@ class Transformer(OredModel):
         x = self.dropout(x)
 
         for block in self.blocks:
-            x = block(x)
+            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+                # Recompute the block's activations in the backward pass instead of keeping
+                # them: less memory, about one extra forward pass of compute.
+                x = checkpoint(block, x, use_reentrant=False)
+            else:
+                x = block(x)
 
         x = self.ln_final(x)
         return self.head(x)
@@ -175,9 +209,18 @@ class Transformer(OredModel):
             d_ff=cfg.model.d_ff,
             dropout=cfg.model.dropout,
             tie_weights=cfg.model.tie_weights,
+            attention=cfg.model.attention,
+            gradient_checkpointing=cfg.model.gradient_checkpointing,
         )
 
+    @property
+    def embeddings_tied(self) -> bool:
+        return self.head.weight is self.token_embedding.weight
+
     def describe(self) -> Dict[str, Any]:
+        # The architecture record compared by checkpoint compatibility checks. attention and
+        # gradient_checkpointing are left out on purpose: they change how the same function
+        # is computed, not the parameters, so a checkpoint loads under either setting.
         return {
             "type": "Transformer",
             "vocab_size": self.vocab_size,

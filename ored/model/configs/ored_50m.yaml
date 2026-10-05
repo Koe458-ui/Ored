@@ -1,0 +1,99 @@
+# Ored AI ~50M -- a new model generation, separate from char_transformer (~5.13M).
+#
+# Decoder-only GPT-style transformer: 13 layers, d_model 512, 8 heads x 64, FFN 2048,
+# 1024-token context, 16,384-token byte-level BPE vocabulary, learned absolute positions,
+# pre-LayerNorm, GELU, tied embedding / LM head (no head bias).
+#
+# Tuned to fit an 8 GB laptop GPU (RTX 5060 Laptop): bf16 autocast, SDPA attention,
+# micro-batch 4 x 1024 tokens, 8 accumulation steps = 32 sequences (32,768 tokens) per
+# optimizer step. Measure the real headroom on the GPU with
+#   python scripts/pretrain.py --probe-batch-size
+# and raise data.batch_size (lowering grad_accum_steps) only if it fits comfortably.
+#
+# The dataset is NOT set yet: the corpus has not been supplied. Once it is tokenized into
+# shards (scripts/corpus.py), point data.tokens at it -- a local shard directory in
+# data.tokens.manifest, or data.tokens.dataset_name / dataset_version to fetch from R2 --
+# and data.tokens.tokenizer at the trained tokenizer artifact.
+#
+# Run:  python scripts/pretrain.py --config configs/ored_50m.yaml
+# Only checkpoints/ored_50m/best.pt is kept (replaced by each better epoch).
+
+run_name: ored_50m
+task: language_model
+seed: 1337
+deterministic: false
+
+data:
+  source: tokens
+  tokenizer: subword
+  vocab_size: 16384
+  block_size: 1024
+  stride: 1024
+  batch_size: 4
+  shuffle_train: true
+  num_workers: 2
+  pin_memory: true
+  prefetch_factor: 2
+  persistent_workers: true
+  tokens:
+    manifest: ""
+    dataset_name: ""
+    dataset_version: ""
+    dataset_id: ""
+    cache_dir: data/tokens
+    tokenizer: ""
+    verify: full
+
+model:
+  name: transformer
+  version: ored_50m
+  d_model: 512
+  n_layer: 13
+  n_head: 8
+  d_ff: 2048
+  dropout: 0.1
+  tie_weights: true
+  attention: sdpa
+  gradient_checkpointing: false
+  expected_parameters: 49894912
+
+training:
+  epochs: 5
+  learning_rate: 0.0003
+  optimizer: adamw
+  weight_decay: 0.1
+  loss: cross_entropy
+  scheduler: cosine
+  warmup_steps: 1000
+  min_lr_ratio: 0.1
+  grad_clip: 1.0
+  grad_accum_steps: 8
+  precision: auto
+  compile: false
+  tf32: true
+  early_stopping_patience: 2
+  eval_every_epochs: 1
+  eval_max_batches: 0
+  log_every_steps: 50
+  device: auto
+  resume: ""
+
+checkpoint:
+  policy: best_only
+  best_metric: val_loss
+  best_mode: min
+  save_base: false
+  save_live_every_epochs: 0
+  keep_history: false
+  upload: false
+  r2_upload: false
+
+generation:
+  max_new_tokens: 400
+  temperature: 0.8
+  top_k: 0
+  top_p: 0.0
+  prompt: ""
+
+paths:
+  checkpoint_dir: checkpoints

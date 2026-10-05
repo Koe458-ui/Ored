@@ -87,7 +87,34 @@ class SupabaseDataConfig:
                 raise ValueError(f"data.supabase.{name} must be a list")
 
 
-DATA_SOURCES = ("generated", "supabase")
+@dataclass
+class TokenDataConfig:
+    """A pre-tokenized dataset (token shards + manifest.json), used by data.source: tokens.
+
+    The shards live in R2 under datasets/<dataset_name>/<dataset_version>/ and are
+    cached in cache_dir. Nothing here names a file format: the raw corpus is turned
+    into shards by scripts/corpus.py once its format is known.
+    """
+
+    manifest: str = ""
+
+    dataset_name: str = ""
+    dataset_version: str = ""
+    dataset_id: str = ""
+
+    cache_dir: str = "data/tokens"
+
+    tokenizer: str = ""
+
+    verify: str = "full"
+
+    def validate(self) -> None:
+        if self.verify not in ("full", "size"):
+            raise ValueError("data.tokens.verify must be full (sha256 every shard) or size")
+
+
+DATA_SOURCES = ("generated", "supabase", "tokens")
+LOADER_DEFAULT_PREFETCH = 2
 
 
 @dataclass
@@ -113,6 +140,13 @@ class DataConfig:
 
     supabase: SupabaseDataConfig = field(default_factory=SupabaseDataConfig)
 
+    tokens: TokenDataConfig = field(default_factory=TokenDataConfig)
+
+    num_workers: int = 0
+    pin_memory: bool = False
+    prefetch_factor: int = LOADER_DEFAULT_PREFETCH
+    persistent_workers: bool = False
+
     def validate(self) -> None:
         if self.source not in DATA_SOURCES:
             raise ValueError(f"data.source must be one of {', '.join(DATA_SOURCES)}")
@@ -120,6 +154,11 @@ class DataConfig:
             raise ValueError("data.source is supabase, so data.supabase.dataset_tag must name the "
                              "dataset (a tag, or 'all' for every row)")
         self.supabase.validate()
+        self.tokens.validate()
+        if self.num_workers < 0:
+            raise ValueError("data.num_workers must be >= 0")
+        if self.prefetch_factor < 1:
+            raise ValueError("data.prefetch_factor must be >= 1")
         if self.n_bits < 1:
             raise ValueError("data.n_bits must be >= 1")
         if self.batch_size < 1:
@@ -157,9 +196,22 @@ class ModelConfig:
     d_ff: int = 512
     tie_weights: bool = True
 
+    version: str = ""
+
+    attention: str = "manual"
+
+    gradient_checkpointing: bool = False
+
+    expected_parameters: int = 0
+
     def validate(self) -> None:
         if not 0.0 <= self.dropout < 1.0:
             raise ValueError("model.dropout must be in [0, 1)")
+        if self.attention not in ("manual", "sdpa"):
+            raise ValueError("model.attention must be manual (explicit T x T scores) or sdpa "
+                             "(torch scaled_dot_product_attention: flash / memory-efficient kernels)")
+        if self.expected_parameters < 0:
+            raise ValueError("model.expected_parameters must be >= 0 (0 = not checked)")
 
         if self.name.lower() == "mlp":
             if not self.hidden_sizes:
@@ -182,6 +234,9 @@ class ModelConfig:
                 )
 
 
+PRECISIONS = ("fp32", "auto", "bf16", "fp16")
+
+
 @dataclass
 class TrainingConfig:
     epochs: int = 200
@@ -200,9 +255,31 @@ class TrainingConfig:
 
     resume: str = ""
 
+    grad_accum_steps: int = 1
+
+    precision: str = "fp32"
+
+    compile: bool = False
+
+    tf32: bool = False
+
+    eval_every_epochs: int = 1
+    eval_max_batches: int = 0
+    log_every_steps: int = 50
+
     def validate(self) -> None:
         if self.epochs < 1:
             raise ValueError("training.epochs must be >= 1")
+        if self.grad_accum_steps < 1:
+            raise ValueError("training.grad_accum_steps must be >= 1")
+        if self.precision not in PRECISIONS:
+            raise ValueError(f"training.precision must be one of {', '.join(PRECISIONS)}")
+        if self.eval_every_epochs < 1:
+            raise ValueError("training.eval_every_epochs must be >= 1")
+        if self.eval_max_batches < 0:
+            raise ValueError("training.eval_max_batches must be >= 0 (0 = the whole split)")
+        if self.log_every_steps < 1:
+            raise ValueError("training.log_every_steps must be >= 1")
         if self.learning_rate <= 0:
             raise ValueError("training.learning_rate must be > 0")
         if self.log_every < 1:
@@ -241,6 +318,9 @@ class GenerationConfig:
             raise ValueError("generation.top_p must be in [0, 1]")
 
 
+CHECKPOINT_POLICIES = ("roles", "best_only")
+
+
 @dataclass
 class CheckpointConfig:
 
@@ -261,7 +341,15 @@ class CheckpointConfig:
     upload: bool = False
     keep_superseded_live: bool = False
 
+    policy: str = "roles"
+
+    r2_upload: bool = False
+
     def validate(self) -> None:
+        if self.policy not in CHECKPOINT_POLICIES:
+            raise ValueError("checkpoint.policy must be roles (base/live/best/history) or best_only")
+        if self.policy == "best_only" and self.keep_history:
+            raise ValueError("checkpoint.policy best_only keeps best.pt alone: keep_history must be false")
         if self.best_mode not in ("min", "max"):
             raise ValueError("checkpoint.best_mode must be 'min' (lower is better) or 'max'")
         if not self.best_metric:
@@ -339,6 +427,13 @@ class Config:
     def validate(self) -> "Config":
         if self.data.source == "supabase" and self.task != "language_model":
             raise ValueError("data.source: supabase feeds the language_model task only")
+        if self.data.source == "tokens" and self.task != "language_model":
+            raise ValueError("data.source: tokens feeds the language_model task only")
+        if (self.data.source == "tokens") != (self.checkpoint.policy == "best_only"):
+            raise ValueError("data.source: tokens trains with the best-only pretraining loop, so it "
+                             "goes with checkpoint.policy: best_only (and only it)")
+        if self.data.source == "tokens" and self.distributed.enabled:
+            raise ValueError("data.source: tokens is single-GPU for now; distributed.enabled must be false")
         self.data.validate()
         self.model.validate()
         self.training.validate()

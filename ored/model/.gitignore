@@ -33,6 +33,12 @@ checkpoints/*
 data/raw/*
 data/processed/*
 data/snapshots/
+data/tokens/
+data/tokenizers/
+data/corpora/
+best.pt.tmp-*
+*.bin.part
+.progress.json
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/README.md

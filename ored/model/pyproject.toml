@@ -17,6 +17,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Only needed to read raw corpora in these formats (ored.data.readers); .jsonl and
+# .jsonl.gz need nothing extra. Install when the corpus turns out to use them.
+corpus = ["zstandard>=0.22,<1.0", "pyarrow>=15.0"]
 
 [project.scripts]
 ored-generate-dataset = "ored.data.generate:main"
@@ -29,6 +32,8 @@ ored-export-learning = "ored.learning.export_cli:main"
 ored-checkpoints = "ored.learning.checkpoint_cli:main"
 ored-serve = "ored.serving.server:main"
 ored-distributed = "ored.distributed.cli:main"
+ored-pretrain = "ored.training.pretrain:main"
+ored-corpus = "ored.data.corpus_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -147,6 +147,39 @@ class SupabaseStore:
             raise StoreError("ored_dataset_register returned nothing")
         return self._build(Dataset, returned)
 
+    def register_external_dataset(self, entry: Any) -> Dict[str, Any]:
+        """Register (or find, by name + version_label) an R2-stored dataset in ored_datasets.
+
+        entry is an ored.data.dataset_registry.DatasetEntry; only metadata is sent."""
+        returned = self._call("POST", "/rpc/ored_dataset_register_external", {"p_row": entry.to_row()})
+        if isinstance(returned, list):
+            returned = returned[0] if returned else None
+        if not returned:
+            raise StoreError("ored_dataset_register_external returned nothing")
+        return returned
+
+    def external_dataset(self, name: str, version_label: str) -> Optional[Dict[str, Any]]:
+        query = (f"/{self._table(Dataset)}?select=*&source=eq.external"
+                 f"&name=eq.{urllib.parse.quote(name, safe='')}"
+                 f"&version_label=eq.{urllib.parse.quote(version_label, safe='')}")
+        found = self._call("GET", query)
+        return found[0] if found else None
+
+    def update_external_dataset(self, dataset_id: str, fields: Dict[str, Any]) -> Dict[str, Any]:
+        """Fill in what becomes known later (status, counts, sha256, manifest). The database
+        freezes a dataset's identity once its status is ready."""
+        allowed = {"status", "storage_provider", "storage_bucket", "storage_path", "file_name", "file_format",
+                   "compression", "external_id", "source_id", "size_bytes", "document_count", "token_count",
+                   "sha256", "manifest", "metadata", "summary", "dataset_type"}
+        unknown = sorted(set(fields) - allowed)
+        if unknown:
+            raise StoreError(f"cannot update {unknown} on a registered dataset")
+        path = f"/{self._table(Dataset)}?id=eq.{urllib.parse.quote(dataset_id)}&source=eq.external"
+        returned = self._call("PATCH", path, fields, "return=representation")
+        if not returned:
+            raise StoreError(f"external dataset {dataset_id} was not updated")
+        return returned[0]
+
     def set_dataset_storage(self, dataset_id: str, storage_path: str) -> Dataset:
         path = f"/{self._table(Dataset)}?id=eq.{urllib.parse.quote(dataset_id)}"
         returned = self._call("PATCH", path, {"storage_path": storage_path}, "return=representation")
