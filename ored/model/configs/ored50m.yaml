@@ -38,7 +38,7 @@ model:
   expected_parameters: 49894912
 
 training:
-  epochs: 5
+  epochs: 2
   learning_rate: 0.0003
   optimizer: adamw
   weight_decay: 0.1
@@ -51,9 +51,11 @@ training:
   precision: auto
   compile: false
   tf32: true
-  early_stopping_patience: 2
+  early_stopping_patience: 5
   eval_every_epochs: 1
   eval_max_batches: 0
+  eval_every_steps: 1000
+  eval_windows: 2000
   log_every_steps: 50
   device: auto
   resume: ""

@@ -176,6 +176,13 @@ class R2Store(CheckpointStore):
         tmp.replace(path)
         return path
 
+    def read_head(self, object_path: str, length: int) -> bytes:
+        status, _, body = self._request("GET", self._key_url(object_path),
+                                        headers={"range": f"bytes=0-{max(1, length) - 1}"})
+        if status == 404:
+            raise StoreError(f"GET r2://{self.bucket}/{object_path} -> 404 not found")
+        return body[:length]
+
     def remove(self, object_path: str) -> None:
         if self.stat(object_path) is None:
             raise StoreError(f"DELETE r2://{self.bucket}/{object_path} -> 404 not found")

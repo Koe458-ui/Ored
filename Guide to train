@@ -26,24 +26,25 @@ PART 3 — KEYS
   9. Set Your R2 Keys
   10. Set Your Supabase Keys
 
-PART 4 — GET THE DATA READY (once, when the corpus file arrives)
-  11. Look at the File
-  12. Register It in Supabase
-  13. Upload the Raw File to R2
-  14. Train the Tokenizer
+PART 4 — GET THE DATA READY (your files in R2, 1–5 GB)
+  11. See Your Files in R2
+  12. Look Inside a File
+  13. Download the Files
+  14. Train the Tokenizer (once)
   15. Build the Training Shards
   16. Upload the Shards to R2
-  17. Mark the Dataset Ready
+  17. Register the Dataset in Supabase
+  18. When You Add or Delete Files
 
 PART 5 — TRAIN
-  18. Measure What Fits on the GPU
-  19. Train
-  20. Continue Stopped Training
-  21. Keep best.pt in R2 Too
-  22. If It Runs Out of GPU Memory
+  19. Measure What Fits on the GPU
+  20. Train
+  21. Continue Stopped Training
+  22. Keep best.pt in R2 Too
+  23. If It Runs Out of GPU Memory
 
 PART 6 — NOT THERE YET
-  23. What ored50m Cannot Do Yet
+  24. What ored50m Cannot Do Yet
 
 ---
 
@@ -195,7 +196,7 @@ worse validation loss  → nothing is saved
 
 There is no base.pt, no live.pt, no history\ folder, no epoch_001.pt.
 
-In R2 (step 21) it is:
+In R2 (step 22) it is, in the ored-checkpoints bucket:
 
 ored-ai/checkpoints/ored50m/best.pt
 
@@ -214,9 +215,10 @@ RUN
 set ORED_R2_ACCOUNT_ID=YOUR_ACCOUNT_ID
 set ORED_R2_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
 set ORED_R2_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
-set ORED_R2_BUCKET=YOUR_BUCKET_NAME
+set ORED_R2_BUCKET=ored-datasets
+set ORED_R2_CHECKPOINT_BUCKET=ored-checkpoints
 
-Get them from:
+Get the keys from:
 
 Cloudflare → R2 → Manage API tokens → Create API token (Object Read & Write)
 
@@ -246,22 +248,38 @@ Supabase → Ored.ai project → Project Settings → API Keys → Secret key
 ---
 
 ========================================
-PART 4 — GET THE DATA READY (once, when the corpus file arrives)
+PART 4 — GET THE DATA READY (your files in R2, 1–5 GB)
 ========================================
 
-Below, FILE is your corpus file, for example:
+Your raw files stay in the ored-datasets bucket. Below:
 
-C:\Users\username\data\common-pile-1gb.jsonl.gz
+FOLDER   = the folder they are in, as step 11 shows it (e.g. training data/)
+VERSION  = v1 the first time; v2, v3, ... every time the set of files changes
 
-and the dataset is named common-pile, version v0.1-1gb.
+Use the quotes around FOLDER when it has a space.
 
 ---
 
-11. Look at the File
+11. See Your Files in R2
+
+Step 9 first.
 
 RUN
 
-python scripts\corpus.py inspect FILE
+python scripts\corpus.py r2-list
+
+OUTPUT
+
+    3.000 GiB  training data/your-file.jsonl.gz
+1 file(s), 3.000 GiB in r2://ored-datasets/
+
+---
+
+12. Look Inside a File
+
+RUN
+
+python scripts\corpus.py r2-inspect "training data/your-file.jsonl.gz"
 
 OUTPUT
 
@@ -273,51 +291,41 @@ OUTPUT
   ...
 }
 
-Write down:
+Only the first 8 MB are read. Write down:
 
 TEXT_FIELD = the field with the document text (above: text)
 ID_FIELD   = the field with the document id (above: id)
 
 ---
 
-12. Register It in Supabase
-
-Steps 9 and 10 first.
+13. Download the Files
 
 RUN
 
-python scripts\corpus.py register --name common-pile --version-label v0.1-1gb --file FILE --bucket YOUR_BUCKET_NAME --dataset-type pretraining_corpus
+python scripts\corpus.py r2-fetch --prefix "training data/" --out data\raw\training-data --decompress
 
-OUTPUT
+--decompress unpacks .gz / .zst files after download, so one big file can be
+split across all your CPU cores in step 15. Files already downloaded are skipped.
 
-"status": "registered",
+Needs free disk: about 3–4 x the size in R2 (unpacked text is bigger).
 
 ---
 
-13. Upload the Raw File to R2
+14. Train the Tokenizer (once)
 
 RUN
 
-python scripts\corpus.py upload-raw --file FILE --name common-pile --version v0.1-1gb
+python scripts\corpus.py train-tokenizer --input data\raw\training-data --text-field TEXT_FIELD --vocab-size 16384 --max-bytes 300000000 --name ored-bpe-16k --version v1 --out data\tokenizers\ored-bpe-16k-v1.json
 
-OUTPUT
-
-"object": "ored-ai/datasets/common-pile/v0.1-1gb/common-pile-1gb.jsonl.gz",
-
----
-
-14. Train the Tokenizer
-
-RUN
-
-python scripts\corpus.py train-tokenizer --input FILE --text-field TEXT_FIELD --vocab-size 16384 --max-bytes 300000000 --name ored-bpe-16k --version v1 --out data\tokenizers\ored-bpe-16k-v1.json
+It learns from a 300 MB sample spread over all files.
 
 OUTPUT (end)
 
 "vocab_size": 16384,
 "sha256": "<64 letters>"
 
-Do this ONCE. Every training run uses this same file.
+Keep this file. Every dataset version and every training run uses it.
+Adding or deleting files later does NOT need a new tokenizer.
 
 ---
 
@@ -325,12 +333,14 @@ Do this ONCE. Every training run uses this same file.
 
 RUN
 
-python scripts\corpus.py build-shards --input FILE --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name common-pile --version v0.1-1gb --out data\tokens\common-pile\v0.1-1gb\ored-bpe-16k-v1
+python scripts\corpus.py build-shards --input data\raw\training-data --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name training-data --version VERSION --out data\tokens\training-data\VERSION --workers 8
+
+--workers = how many CPU cores to use (number of cores minus 1 is fine).
 
 OUTPUT (end)
 
 "content_sha256": "<64 letters>",
-"counts": { "documents": {...}, "tokens": {...} }
+"counts": { "documents": {...}, "tokens": {"train": ..., "val": ..., "test": ...} }
 
 If it stops, run the same command again: it continues where it stopped.
 
@@ -340,23 +350,46 @@ If it stops, run the same command again: it continues where it stopped.
 
 RUN
 
-python scripts\corpus.py publish --dir data\tokens\common-pile\v0.1-1gb\ored-bpe-16k-v1 --name common-pile --version v0.1-1gb
+python scripts\corpus.py publish --dir data\tokens\training-data\VERSION --name training-data --version VERSION
 
 ---
 
-17. Mark the Dataset Ready
+17. Register the Dataset in Supabase
 
-Use the sha256 printed in step 13 and the document count from step 15:
+Step 10 first. Use the content_sha256 and token count from step 15:
 
 RUN
 
-python scripts\corpus.py update-registry --name common-pile --version-label v0.1-1gb --set sha256=SHA256_FROM_STEP_13 --set document_count=NUMBER --set status=ready
+python scripts\corpus.py register --name training-data --version-label VERSION --bucket ored-datasets --storage-path "training data" --dataset-type pretraining_corpus
 
-OUTPUT
+python scripts\corpus.py update-registry --name training-data --version-label VERSION --set sha256=CONTENT_SHA256 --set token_count=TRAIN_PLUS_VAL_PLUS_TEST_TOKENS --set status=ready
 
-"status": "ready",
+After status=ready the record can no longer be changed (only deprecated).
 
-After this the dataset record can no longer be changed (only deprecated).
+---
+
+18. When You Add or Delete Files
+
+1. Add or delete the files in the R2 folder.
+2. Make a fresh download folder for the new set (old files are not removed
+   from an existing folder):
+
+   python scripts\corpus.py r2-fetch --prefix "training data/" --out data\raw\training-data-VERSION --decompress
+
+3. Step 15 with the NEW version and --reuse-from the previous one:
+
+   python scripts\corpus.py build-shards --input data\raw\training-data-VERSION --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name training-data --version VERSION --out data\tokens\training-data\VERSION --workers 8 --reuse-from data\tokens\training-data\PREVIOUS_VERSION
+
+   Files that did not change are not tokenized again; only new files are.
+
+4. Steps 16 and 17 with the new VERSION.
+5. Keep training the same model on the new version (set DATA with the new
+   VERSION first, see PART 5):
+
+   python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --init-from checkpoints\ored50m\best.pt --run-name ored50m-VERSION
+
+   It starts from the old model's weights; its own best.pt goes to
+   checkpoints\ored50m-VERSION\. (--resume only works on the same version.)
 
 ---
 
@@ -364,15 +397,16 @@ After this the dataset record can no longer be changed (only deprecated).
 PART 5 — TRAIN
 ========================================
 
-Every train command below uses the same data settings. Write them once:
+Every train command below uses the same data settings. Write them once
+(VERSION = the dataset version you built in step 15):
 
 RUN
 
-set DATA=--set data.tokens.manifest=data\tokens\common-pile\v0.1-1gb\ored-bpe-16k-v1 --set data.tokens.tokenizer=data\tokenizers\ored-bpe-16k-v1.json --set data.tokens.dataset_name=common-pile --set data.tokens.dataset_version=v0.1-1gb
+set DATA=--set data.tokens.manifest=data\tokens\training-data\VERSION --set data.tokens.tokenizer=data\tokenizers\ored-bpe-16k-v1.json --set data.tokens.dataset_name=training-data --set data.tokens.dataset_version=VERSION
 
 ---
 
-18. Measure What Fits on the GPU
+19. Measure What Fits on the GPU
 
 RUN
 
@@ -392,7 +426,7 @@ If a bigger batch fits with room to spare, e.g. 8, use half the accumulation:
 
 ---
 
-19. Train
+20. Train
 
 RUN
 
@@ -402,29 +436,34 @@ OUTPUT (start)
 
 PRETRAINING RUN: ored50m (ored50m)
 GPU: NVIDIA GeForce RTX 5060 Laptop GPU ...
-VRAM: ... GiB total, ... GiB free at start
 parameters    : 49,894,912
 precision     : bf16
 batch         : micro-batch 4 x 1024 tokens, grad accumulation 8 -> effective 32 sequences = 32,768 tokens per optimizer step
-dataset       : common-pile v0.1-1gb (content ...)
+schedule      : ... steps/epoch, ... total
+dataset       : training-data VERSION (content ...)
 
-During training:
+Every 1000 steps it checks the validation loss on a fixed sample of 2000
+windows; if it is better, best.pt is replaced:
 
-Epoch   1/5 | train loss ... | val loss ... | best ... | ... tok/s | peak ... GiB  <- new best.pt
+Epoch   1/2 step 1,000 | train loss ... | val loss ... | best ... | ... tok/s | peak ... GiB  <- new best.pt
+
+It trains 2 epochs (2 passes over the data) and stops early after 5 checks
+in a row without improvement.
 
 ---
 
-20. Continue Stopped Training
+21. Continue Stopped Training
 
 RUN
 
 python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --resume
 
-It continues after the epoch saved in best.pt.
+It continues from the step saved in best.pt, inside the same epoch.
+Steps trained after the last best.pt are trained again.
 
 ---
 
-21. Keep best.pt in R2 Too
+22. Keep best.pt in R2 Too
 
 Step 9 first. Add this to the train command:
 
@@ -434,12 +473,12 @@ RUN
 
 python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --set checkpoint.r2_upload=true
 
-Every new best.pt replaces ored-ai/checkpoints/ored50m/best.pt in R2.
-Only one copy is ever kept.
+Every new best.pt replaces ored-ai/checkpoints/ored50m/best.pt in the
+ored-checkpoints bucket. Only one copy is ever kept.
 
 ---
 
-22. If It Runs Out of GPU Memory
+23. If It Runs Out of GPU Memory
 
 The run stops with:
 
@@ -453,7 +492,7 @@ or:
 
 --set model.gradient_checkpointing=true
 
-and run step 19 again.
+and run step 20 again (or step 21 to continue).
 
 ---
 
@@ -461,7 +500,7 @@ and run step 19 again.
 PART 6 — NOT THERE YET
 ========================================
 
-23. What ored50m Cannot Do Yet
+24. What ored50m Cannot Do Yet
 
 - Train on many PCs.
 - Answer questions (scripts\infer.py / scripts\generate.py read the old

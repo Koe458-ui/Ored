@@ -22,6 +22,7 @@ class R2Settings:
     account_id: str = field(default="", repr=False)
     endpoint: str = ""
     prefix: str = DEFAULT_PREFIX
+    checkpoint_bucket: str = ""
 
     @classmethod
     def from_env(cls, environ: Optional[Mapping[str, str]] = None) -> "R2Settings":
@@ -36,7 +37,8 @@ class R2Settings:
         settings = cls(bucket=get("ORED_R2_BUCKET"), access_key_id=get("ORED_R2_ACCESS_KEY_ID"),
                        secret_access_key=get("ORED_R2_SECRET_ACCESS_KEY"),
                        account_id=get("ORED_R2_ACCOUNT_ID"), endpoint=get("ORED_R2_ENDPOINT"),
-                       prefix=get("ORED_R2_PREFIX") or DEFAULT_PREFIX)
+                       prefix=get("ORED_R2_PREFIX") or DEFAULT_PREFIX,
+                       checkpoint_bucket=get("ORED_R2_CHECKPOINT_BUCKET"))
         settings.validate()
         return settings
 
@@ -51,16 +53,22 @@ class R2Settings:
     def validate(self) -> None:
         if not BUCKET.match(self.bucket):
             raise StorageConfigError(f"ORED_R2_BUCKET {self.bucket!r} is not a valid bucket name")
+        if self.checkpoint_bucket and not BUCKET.match(self.checkpoint_bucket):
+            raise StorageConfigError(f"ORED_R2_CHECKPOINT_BUCKET {self.checkpoint_bucket!r} is not a valid bucket name")
         if self.endpoint and not self.endpoint.startswith(("https://", "http://127.0.0.1", "http://localhost")):
             raise StorageConfigError("ORED_R2_ENDPOINT must be an https:// URL")
 
     def describe(self) -> Dict[str, Any]:
-        return {"bucket": self.bucket, "prefix": self.prefix,
+        return {"bucket": self.bucket, "checkpoint_bucket": self.checkpoint_bucket or self.bucket,
+                "prefix": self.prefix,
                 "endpoint": self.endpoint or "https://<account>.r2.cloudflarestorage.com",
                 "account_id": "set" if self.account_id else "unset",
                 "access_key_id": "set", "secret_access_key": "set"}
 
-    def store(self) -> Any:
+    def store(self, bucket: str = "") -> Any:
         from ored.learning.r2 import R2Store
         return R2Store(self.account_id or "-", self.access_key_id, self.secret_access_key,
-                       self.bucket, endpoint=self.endpoint)
+                       bucket or self.bucket, endpoint=self.endpoint)
+
+    def checkpoint_store(self) -> Any:
+        return self.store(self.checkpoint_bucket)

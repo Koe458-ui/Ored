@@ -271,7 +271,7 @@ def test_shard_build_is_deterministic_and_resumable(shards, tmp_path, tokenizer,
 
     def flaky(unit, *args, **kwargs):
         calls["n"] += 1
-        if unit == 1 and calls["n"] == 2:
+        if calls["n"] == 2:
             raise KeyboardInterrupt("simulated crash in unit 1")
         return real(unit, *args, **kwargs)
 
@@ -318,6 +318,9 @@ def test_r2_settings_never_show_secrets():
     for secret in ("AKIA-SECRET-ID", "very-secret-value", "acct123"):
         assert secret not in shown
     assert settings.prefix == "ored-ai" and settings.store().bucket == "ored-ai-data"
+    assert settings.checkpoint_store().bucket == "ored-ai-data"
+    split = R2Settings.from_env({**ENV, "ORED_R2_CHECKPOINT_BUCKET": "ored-checkpoints"})
+    assert split.checkpoint_store().bucket == "ored-checkpoints" and split.store().bucket == "ored-ai-data"
     with pytest.raises(StorageConfigError) as missing:
         R2Settings.from_env({"ORED_R2_SECRET_ACCESS_KEY": "very-secret-value"})
     assert "ORED_R2_BUCKET" in str(missing.value) and "very-secret-value" not in str(missing.value)
@@ -456,6 +459,7 @@ def tiny_cfg(tmp_path, out, artifact, **extra):
         "model.n_head=4", "model.d_ff=64", "model.expected_parameters=0", "model.gradient_checkpointing=true",
         "training.epochs=3", "training.grad_accum_steps=2", "training.warmup_steps=2",
         "training.device=cpu", "training.log_every_steps=5", "training.early_stopping_patience=0",
+        "training.eval_every_steps=0", "training.eval_windows=0",
         f"paths.checkpoint_dir={tmp_path / 'checkpoints'}",
     ] + [f"{k}={v}" for k, v in extra.items()]
     return load_config(CONFIG_50M, overrides)
@@ -537,3 +541,116 @@ def test_corpus_cli_inspect_layout_and_registry_row(tmp_path, capsys, monkeypatc
     assert row["file_format"] == "jsonl" and row["compression"] == "gzip" and row["token_count"] is None
     assert row["size_bytes"] == path.stat().st_size and len(row["sha256"]) == 64 and row["status"] == "registered"
     assert row["storage_path"] == "ored-ai/datasets/common-pile/v0.1-1gb"
+
+
+def test_chunked_jsonl_matches_one_unit_and_keys_follow_the_file(tmp_path, tokenizer, artifact):
+    _, info = load_artifact(artifact)
+    source = write_jsonl(tmp_path / "big.jsonl", synthetic_docs(300, 5, "big"))
+    whole = BuildSettings(text_field="body", id_field="meta.uid", chunk_bytes=0, max_tokens_per_shard=4096)
+    chunked = BuildSettings(text_field="body", id_field="meta.uid", chunk_bytes=8192, max_tokens_per_shard=4096)
+    m1 = build_token_shards([source], tokenizer, info, tmp_path / "w", whole, "x", "v1", log=lambda m: None)
+    m2 = build_token_shards([source], tokenizer, info, tmp_path / "c", chunked, "x", "v1", workers=2,
+                            log=lambda m: None)
+    assert len(m1["units"]) == 1 and len(m2["units"]) > 3
+    assert m1["counts"] == m2["counts"]
+    sha16 = m2["dataset"]["sources"][0]["sha256"][:16]
+    assert all(key.startswith(sha16 + "-c") for key in m2["units"])
+
+
+def test_adding_a_file_reuses_the_tokenized_ones(tmp_path, tokenizer, artifact, monkeypatch):
+    _, info = load_artifact(artifact)
+    a = write_jsonl(tmp_path / "a.jsonl", synthetic_docs(100, 1, "a"))
+    b = write_jsonl(tmp_path / "b.jsonl.gz", synthetic_docs(100, 2, "b"), compress=True)
+    settings = BuildSettings(text_field="body", id_field="meta.uid", chunk_bytes=0, max_tokens_per_shard=4096)
+    v1 = build_token_shards([a], tokenizer, info, tmp_path / "v1", settings, "x", "v1", log=lambda m: None)
+    import ored.data.token_shards as ts
+    real, seen = ts.tokenize_unit, []
+    monkeypatch.setattr(ts, "tokenize_unit", lambda unit, *rest, **kw: (seen.append(unit), real(unit, *rest, **kw))[1])
+    v2 = build_token_shards([a, b], tokenizer, info, tmp_path / "v2", settings, "x", "v2",
+                            reuse_from=[tmp_path / "v1"], log=lambda m: None)
+    fresh = build_token_shards([a, b], tokenizer, info, tmp_path / "fresh", settings, "x", "v2", log=lambda m: None)
+    assert len(seen) == 3 and seen[0].startswith(v2["dataset"]["sources"][1]["sha256"][:16])
+    assert v2["content_sha256"] == fresh["content_sha256"] != v1["content_sha256"]
+    v3 = build_token_shards([b], tokenizer, info, tmp_path / "v3", settings, "x", "v3",
+                            reuse_from=[tmp_path / "v2"], log=lambda m: None)
+    assert len(seen) == 3 and sum(v3["counts"]["documents"].values()) == 100
+
+
+def test_raw_files_in_r2_can_be_listed_inspected_and_fetched(tmp_path, r2):
+    from ored.storage.raw import fetch_raw, inspect_object, list_raw
+
+    gz = write_jsonl(tmp_path / "part 1.jsonl.gz", synthetic_docs(50, 3, "p"), compress=True)
+    r2.upload(gz, "training data/part 1.jsonl.gz")
+    r2.upload(write_jsonl(tmp_path / "other.jsonl", synthetic_docs(2)), "elsewhere/other.jsonl")
+    assert [i["key"] for i in list_raw(r2, "training data")] == ["training data/part 1.jsonl.gz"]
+    report = inspect_object(r2, "training data/part 1.jsonl.gz", head_bytes=4096)
+    assert report["file_format"] == "jsonl" and report["compression"] == "gzip" and "body" in report["fields"]
+    fetched = fetch_raw(r2, "training data/", tmp_path / "raw", decompress=True, log=lambda m: None)
+    assert [Path(f["path"]).name for f in fetched] == ["part 1.jsonl"]
+    assert len(list(open_reader(fetched[0]["path"], "body"))) == 50
+    again = fetch_raw(r2, "training data/", tmp_path / "raw", decompress=True, log=lambda m: None)
+    assert again[0]["sha256"] == fetched[0]["sha256"]
+
+
+def test_epoch_sampler_skips_exactly_what_was_trained():
+    from ored.training.pretrain import EpochSampler
+
+    sampler = EpochSampler(50, seed=3, shuffle=True)
+    sampler.set_epoch(2)
+    full = list(sampler)
+    sampler.set_epoch(2, skip=20)
+    assert list(sampler) == full[20:] and len(sampler) == 30 and sorted(full) == list(range(50))
+    sampler.set_epoch(3)
+    assert list(sampler) != full
+
+
+def test_step_evaluation_saves_mid_epoch_and_resumes_there(shards, tmp_path, artifact, monkeypatch):
+    out, *_ = shards
+    cfg = tiny_cfg(tmp_path, out, artifact, **{"training.eval_every_steps": 7, "training.eval_windows": 20,
+                                               "training.epochs": 1})
+    trainer = PretrainTrainer(cfg)
+    assert len(trainer.val_set) == 20
+    losses = iter([3.0, 2.0, 2.5, 2.6] + [9.0] * 100)
+    monkeypatch.setattr(trainer, "evaluate", lambda split="val": next(losses))
+    trainer.fit()
+    steps = [r["global_step"] for r in trainer.history]
+    assert steps[:4] == [7, 14, 21, 28] and steps[-1] == trainer.global_step
+    payload = torch.load(Path(cfg.checkpoint_dir) / "best.pt", weights_only=True)
+    assert payload["global_step"] == 14 and payload["position"] == {
+        "epoch": 1, "micro_batch": 28, "epoch_complete": False}
+    resumed = PretrainTrainer(tiny_cfg(tmp_path, out, artifact, **{"training.resume": "best",
+                                                                   "training.eval_every_steps": 7,
+                                                                   "training.epochs": 1}))
+    assert (resumed.start_epoch, resumed.skip_micro_batches, resumed.global_step) == (1, 28, 14)
+    batches = []
+    real = resumed._loss
+    monkeypatch.setattr(resumed, "_loss", lambda x, y: (batches.append(1), real(x, y))[1])
+    monkeypatch.setattr(resumed, "evaluate", lambda split="val": 5.0)
+    resumed.fit()
+    assert len(batches) == resumed.micro_batches_per_epoch - 28
+
+
+def test_init_from_starts_a_new_run_on_another_dataset_version(shards, tmp_path, artifact, monkeypatch):
+    out, *_ = shards
+    first = PretrainTrainer(tiny_cfg(tmp_path, out, artifact, **{"training.epochs": 1}))
+    first.fit()
+    best = Path(first.cfg.checkpoint_dir) / "best.pt"
+    other = tmp_path / "other"
+    import shutil
+    shutil.copytree(out, other)
+    manifest = json.loads((other / "manifest.json").read_text())
+    manifest["dataset"]["version"] = "v2"
+    from ored.data.token_shards import content_sha256
+    manifest["content_sha256"] = content_sha256(manifest)
+    (other / "manifest.json").write_text(json.dumps(manifest))
+    cfg = tiny_cfg(tmp_path, other, artifact, **{"training.epochs": 1, "run_name": "ored50m-v2"})
+    with pytest.raises(BestCheckpointError, match="dataset"):
+        PretrainTrainer(tiny_cfg(tmp_path, other, artifact, **{"training.resume": "best", "training.epochs": 1}))
+    cfg.training.init_from = str(best)
+    second = PretrainTrainer(cfg)
+    assert second.global_step == 0 and second.start_epoch == 1
+    for name, tensor in torch.load(best, weights_only=True)["model_state_dict"].items():
+        assert torch.equal(second.model.state_dict()[name].cpu(), tensor.cpu())
+    second.fit()
+    payload = torch.load(Path(cfg.checkpoint_dir) / "best.pt", weights_only=True)
+    assert payload["initialised_from"]["path"] == str(best) and payload["dataset"]["version"] == "v2"

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, RandomSampler
+from torch.utils.data import DataLoader, Sampler, Subset
 
 from ored.config import Config, load_config
 from ored.data.token_shards import (
@@ -102,6 +102,36 @@ def prepare_token_data(cfg: Config) -> PretrainData:
     return PretrainData(directory, manifest, identity, tokenizer, info, train, val)
 
 
+class EpochSampler(Sampler):
+
+    def __init__(self, size: int, seed: int, shuffle: bool) -> None:
+        self.size = size
+        self.seed = seed
+        self.shuffle = shuffle
+        self.epoch = 0
+        self.skip = 0
+
+    def set_epoch(self, epoch: int, skip: int = 0) -> None:
+        self.epoch = epoch
+        self.skip = min(skip, self.size)
+
+    def __iter__(self):
+        if self.shuffle:
+            order = torch.randperm(self.size, generator=torch.Generator().manual_seed(self.seed + self.epoch))
+            return iter(order[self.skip:].tolist())
+        return iter(range(self.skip, self.size))
+
+    def __len__(self) -> int:
+        return self.size - self.skip
+
+
+def validation_sample(dataset: TokenWindowDataset, windows: int, seed: int) -> Any:
+    if not windows or windows >= len(dataset):
+        return dataset
+    chosen = torch.randperm(len(dataset), generator=torch.Generator().manual_seed(seed))[:windows]
+    return Subset(dataset, sorted(chosen.tolist()))
+
+
 def build_adamw(model: nn.Module, cfg: Config, device: torch.device) -> torch.optim.Optimizer:
     if cfg.training.optimizer.lower() != "adamw":
         raise PretrainError("the pretraining loop uses training.optimizer: adamw")
@@ -149,9 +179,10 @@ class PretrainTrainer:
         self.scaler = gpu.make_scaler(self.precision.use_scaler)
         self.forward_model = torch.compile(self.model) if cfg.training.compile else self.model
 
-        self.generator = torch.Generator()
-        self.loaders = {"train": self._loader(self.data.train, shuffle=cfg.data.shuffle_train),
-                        "val": self._loader(self.data.val, shuffle=False)}
+        self.sampler = EpochSampler(len(self.data.train), cfg.seed, cfg.data.shuffle_train)
+        self.val_set = validation_sample(self.data.val, cfg.training.eval_windows, cfg.seed)
+        self.loaders = {"train": self._loader(self.data.train, self.sampler),
+                        "val": self._loader(self.val_set, None)}
         self.micro_batches_per_epoch = len(self.loaders["train"])
         self.accum = cfg.training.grad_accum_steps
         self.steps_per_epoch = math.ceil(self.micro_batches_per_epoch / self.accum)
@@ -165,32 +196,48 @@ class PretrainTrainer:
         if cfg.checkpoint.r2_upload:
             from ored.storage import ObjectLayout, R2Settings
             settings = R2Settings.from_env()
-            self.store = store or settings.store()
+            self.store = store or settings.checkpoint_store()
             self.r2_object = ObjectLayout(settings.prefix).checkpoint_best(cfg.run_name)
         self.upload_errors: List[str] = []
 
         self.start_epoch = 1
+        self.skip_micro_batches = 0
         self.global_step = 0
         self.history: List[Dict[str, Any]] = []
-        self.epochs_without_improvement = 0
+        self.evals_without_improvement = 0
+        self.stop = False
+        if cfg.training.resume and cfg.training.init_from:
+            raise PretrainError("use either --resume (same run) or --init-from (new run), not both")
+        if cfg.training.init_from:
+            self._init_from(cfg.training.init_from)
         if cfg.training.resume == "best":
             self._resume()
         elif cfg.training.resume:
             raise PretrainError("this model resumes only from its own best.pt: training.resume=best")
 
 
-    def _loader(self, dataset: TokenWindowDataset, shuffle: bool) -> DataLoader:
+    def _loader(self, dataset: Any, sampler: Optional[Sampler]) -> DataLoader:
         cfg = self.cfg.data
         workers = cfg.num_workers
         options: Dict[str, Any] = {"batch_size": cfg.batch_size, "num_workers": workers,
                                    "pin_memory": cfg.pin_memory and self.device.type == "cuda"}
         if workers > 0:
-            options.update(persistent_workers=cfg.persistent_workers, prefetch_factor=cfg.prefetch_factor)
-        sampler = RandomSampler(dataset, generator=self.generator) if shuffle else None
+            options.update(persistent_workers=cfg.persistent_workers and sampler is None,
+                           prefetch_factor=cfg.prefetch_factor)
         return DataLoader(dataset, sampler=sampler, shuffle=False, drop_last=False, **options)
 
     def architecture(self) -> Dict[str, Any]:
         return dict(self.model.describe())
+
+    def _init_from(self, path: str) -> None:
+        payload = BestCheckpoint(Path(path).parent).load(map_location=self.device)
+        check_compatible(payload, model_version=self.model_version, architecture=self.architecture(),
+                         tokenizer_sha256=self.data.tokenizer_info["sha256"], path=path)
+        self.model.load_state_dict(payload["model_state_dict"], strict=True)
+        self.initialised_from = {"path": str(path), "global_step": payload.get("global_step"),
+                                 "dataset": (payload.get("dataset") or {}).get("content_sha256")}
+        logger.info(f"weights from {path} (trained {payload.get('global_step'):,} steps on dataset "
+                    f"{(payload.get('dataset') or {}).get('name')} {(payload.get('dataset') or {}).get('version')})")
 
     def _resume(self) -> None:
         payload = self.best.load(map_location=self.device)
@@ -202,7 +249,12 @@ class PretrainTrainer:
             self.optimizer.load_state_dict(payload["optimizer_state_dict"])
         if payload.get("scaler_state_dict") and self.precision.use_scaler:
             self.scaler.load_state_dict(payload["scaler_state_dict"])
-        self.start_epoch = int(payload["epoch"]) + 1
+        position = payload.get("position") or {"epoch": payload["epoch"], "epoch_complete": True}
+        if position.get("epoch_complete", True):
+            self.start_epoch = int(position["epoch"]) + 1
+        else:
+            self.start_epoch = int(position["epoch"])
+            self.skip_micro_batches = int(position["micro_batch"])
         self.global_step = int(payload["global_step"])
         self.history = list(payload.get("history") or [])
         logger.info(f"resumed from {self.best.path} (epoch {payload['epoch']}, step {self.global_step:,}, "
@@ -221,22 +273,24 @@ class PretrainTrainer:
         for group in self.optimizer.param_groups:
             group["lr"] = self.current_lr
 
-    def _train_epoch(self, epoch: int) -> Dict[str, float]:
+    def _train_epoch(self, epoch: int, skip: int = 0) -> None:
         cfg = self.cfg
         self.model.train()
-        self.generator.manual_seed(cfg.seed + epoch)
+        self.sampler.set_epoch(epoch, skip * cfg.data.batch_size)
         n_micro = self.micro_batches_per_epoch
-        loss_sum = torch.zeros((), device=self.device)
-        examples = 0
-        window_sum = torch.zeros((), device=self.device)
-        window_count = 0
-        window_tokens = 0
-        window_start = time.perf_counter()
-        epoch_start = window_start
-        epoch_tokens = 0
+        log_sum = torch.zeros((), device=self.device)
+        log_count = 0
+        log_tokens = 0
+        log_start = time.perf_counter()
         self.optimizer.zero_grad(set_to_none=True)
+        self.eval_loss_sum = torch.zeros((), device=self.device)
+        self.eval_examples = 0
+        self.eval_tokens = 0
+        self.eval_started = time.perf_counter()
+        self.last_eval_step = -1
 
-        for index, (x, y) in enumerate(self.loaders["train"]):
+        for offset, (x, y) in enumerate(self.loaders["train"]):
+            index = skip + offset
             group_start = (index // self.accum) * self.accum
             group_size = min(self.accum, n_micro - group_start)
             x = x.to(self.device, non_blocking=True)
@@ -245,12 +299,12 @@ class PretrainTrainer:
             self.scaler.scale(loss / group_size).backward()
 
             detached = loss.detach()
-            loss_sum += detached * x.size(0)
-            examples += x.size(0)
-            window_sum += detached
-            window_count += 1
-            window_tokens += x.numel()
-            epoch_tokens += x.numel()
+            self.eval_loss_sum += detached * x.size(0)
+            self.eval_examples += x.size(0)
+            self.eval_tokens += x.numel()
+            log_sum += detached
+            log_count += 1
+            log_tokens += x.numel()
 
             if index + 1 - group_start < group_size:
                 continue
@@ -265,19 +319,57 @@ class PretrainTrainer:
 
             if self.global_step % cfg.training.log_every_steps == 0:
                 gpu.synchronize(self.device)
-                elapsed = time.perf_counter() - window_start
+                elapsed = time.perf_counter() - log_start
                 logger.info(f"epoch {epoch} step {self.global_step:,}/{self.total_steps:,} | "
-                            f"loss {(window_sum / window_count).item():.4f} | lr {self.current_lr:.2e} | "
-                            f"{window_tokens / max(elapsed, 1e-9):,.0f} tok/s | "
+                            f"loss {(log_sum / log_count).item():.4f} | lr {self.current_lr:.2e} | "
+                            f"{log_tokens / max(elapsed, 1e-9):,.0f} tok/s | "
                             f"peak {gpu.peak_memory_gib(self.device):.2f} GiB")
-                window_sum.zero_()
-                window_count = window_tokens = 0
-                window_start = time.perf_counter()
+                log_sum.zero_()
+                log_count = log_tokens = 0
+                log_start = time.perf_counter()
 
+            every = cfg.training.eval_every_steps
+            if every and self.global_step % every == 0:
+                self._evaluate_and_keep(epoch, index + 1)
+                if self.stop:
+                    return
+
+        if self.last_eval_step != self.global_step and (
+                epoch % cfg.training.eval_every_epochs == 0 or epoch == cfg.training.epochs):
+            self._evaluate_and_keep(epoch, n_micro)
+
+    def _evaluate_and_keep(self, epoch: int, micro_done: int) -> None:
         gpu.synchronize(self.device)
-        seconds = time.perf_counter() - epoch_start
-        return {"train_loss": (loss_sum / max(examples, 1)).item(), "seconds": seconds,
-                "tokens_per_second": epoch_tokens / max(seconds, 1e-9), "train_tokens": epoch_tokens}
+        seconds = time.perf_counter() - self.eval_started
+        record: Dict[str, Any] = {
+            "epoch": epoch, "global_step": self.global_step, "micro_batch": micro_done,
+            "epoch_complete": micro_done >= self.micro_batches_per_epoch,
+            "train_loss": (self.eval_loss_sum / max(self.eval_examples, 1)).item(),
+            "tokens_per_second": self.eval_tokens / max(seconds, 1e-9), "lr": self.current_lr,
+        }
+        try:
+            record["val_loss"] = self.evaluate("val")
+        except torch.cuda.OutOfMemoryError as exc:
+            raise self._oom(exc) from exc
+        record["val_ppl"] = math.exp(min(record["val_loss"], 20.0))
+        record["peak_vram_gib"] = gpu.peak_memory_gib(self.device)
+        improved = self.best.consider(record["val_loss"], lambda: self.payload(epoch, record))
+        if improved:
+            self._publish_best()
+            self.evals_without_improvement = 0
+        else:
+            self.evals_without_improvement += 1
+        record["best_val_loss"] = self.best.best_value
+        self.history.append(record)
+        self._log_epoch(record, improved)
+        patience = self.cfg.training.early_stopping_patience
+        if patience and self.evals_without_improvement >= patience:
+            self.stop = True
+        self.last_eval_step = self.global_step
+        self.eval_loss_sum.zero_()
+        self.eval_examples = self.eval_tokens = 0
+        self.eval_started = time.perf_counter()
+        self.model.train()
 
     @torch.no_grad()
     def evaluate(self, split: str = "val") -> float:
@@ -310,9 +402,12 @@ class PretrainTrainer:
             "precision": self.precision.name,
             "epoch": epoch,
             "global_step": self.global_step,
+            "position": {"epoch": epoch, "micro_batch": record["micro_batch"],
+                         "epoch_complete": record["epoch_complete"]},
             "best": {"metric": "val_loss", "mode": "min", "value": record["val_loss"]},
             "metrics": dict(record),
             "history": [dict(r) for r in self.history] + [dict(record)],
+            "initialised_from": getattr(self, "initialised_from", None),
             "tokenizer": dict(self.data.tokenizer_info),
             "dataset": dict(self.data.identity),
             "config": self.cfg.to_dict(),
@@ -349,40 +444,21 @@ class PretrainTrainer:
         cfg = self.cfg
         self._log_header()
         gpu.reset_peak_memory(self.device)
-        patience = cfg.training.early_stopping_patience
-        stopped_early = False
         started = time.time()
         for epoch in range(self.start_epoch, cfg.training.epochs + 1):
-            if patience and self.epochs_without_improvement >= patience:
-                stopped_early = True
+            if self.stop:
                 break
+            skip = self.skip_micro_batches if epoch == self.start_epoch else 0
             try:
-                record: Dict[str, Any] = {"epoch": epoch, **self._train_epoch(epoch), "lr": self.current_lr}
-                evaluate = epoch % cfg.training.eval_every_epochs == 0 or epoch == cfg.training.epochs
-                if evaluate:
-                    record["val_loss"] = self.evaluate("val")
+                self._train_epoch(epoch, skip)
             except torch.cuda.OutOfMemoryError as exc:
                 raise self._oom(exc) from exc
-            record["global_step"] = self.global_step
-            record["peak_vram_gib"] = gpu.peak_memory_gib(self.device)
-
-            improved = False
-            if "val_loss" in record:
-                record["val_ppl"] = math.exp(min(record["val_loss"], 20.0))
-                improved = self.best.consider(record["val_loss"], lambda: self.payload(epoch, record))
-                if improved:
-                    self._publish_best()
-                    self.epochs_without_improvement = 0
-                else:
-                    self.epochs_without_improvement += 1
-            record["best_val_loss"] = self.best.best_value
-            self.history.append(record)
-            self._log_epoch(record, improved)
+        stopped_early = self.stop
 
         self._save_history()
         elapsed = time.time() - started
         logger.info(section("TRAINING COMPLETE"))
-        logger.info(f"epochs run        : {len(self.history)}{' (stopped early)' if stopped_early else ''}")
+        logger.info(f"evaluations       : {len(self.history)}{' (stopped early)' if stopped_early else ''}")
         logger.info(f"wall clock        : {elapsed:,.1f}s")
         logger.info(f"best val_loss     : {self.best.best_value}")
         logger.info(f"checkpoint        : {self.best.path} (the only checkpoint kept)")
@@ -398,10 +474,9 @@ class PretrainTrainer:
                         encoding="utf-8")
 
     def _log_epoch(self, record: Dict[str, Any], improved: bool) -> None:
-        val = (f" | val loss {record['val_loss']:.4f} (ppl {record['val_ppl']:.1f})"
-               if "val_loss" in record else " | no validation this epoch")
+        val = f" | val loss {record['val_loss']:.4f} (ppl {record['val_ppl']:.1f})"
         best = record["best_val_loss"]
-        logger.info(f"Epoch {record['epoch']:>3}/{self.cfg.training.epochs} | train loss "
+        logger.info(f"Epoch {record['epoch']:>3}/{self.cfg.training.epochs} step {record['global_step']:,} | train loss "
                     f"{record['train_loss']:.4f}{val} | best {best if best is None else f'{best:.4f}'} | "
                     f"{record['tokens_per_second']:,.0f} tok/s | peak {record['peak_vram_gib']:.2f} GiB"
                     + ("  <- new best.pt" if improved else ""))
@@ -489,9 +564,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="build the model, print its exact parameter count and stop (no data needed)")
     parser.add_argument("--probe-batch-size", action="store_true",
                         help="measure which micro-batch sizes fit in GPU memory and stop")
+    parser.add_argument("--init-from", metavar="BEST_PT",
+                        help="start a new run from an ored50m best.pt's weights (e.g. on a new dataset version)")
     parser.add_argument("--run-name")
     args = parser.parse_args(argv)
     overrides = list(args.overrides) + (["training.resume=best"] if args.resume else [])
+    if args.init_from:
+        overrides.append(f"training.init_from={args.init_from}")
     cfg = load_config(args.config, overrides)
     if args.run_name:
         cfg.run_name = args.run_name

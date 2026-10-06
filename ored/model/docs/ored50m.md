@@ -110,6 +110,25 @@ python scripts/corpus.py build-shards --input FILE [FILE ...] --text-field <fiel
   them and reads them through `numpy.memmap`.
 * No cleaning, filtering or deduplication is applied yet: those depend on the real corpus.
 
+## A 1–5 GB corpus that changes
+
+The raw files live in the `ored-datasets` bucket, in any folder (`scripts/corpus.py r2-list`,
+`r2-inspect KEY` reads only the first 8 MB, `r2-fetch --prefix FOLDER --out DIR --decompress`).
+
+* Work is split into units keyed by each file's sha256. An uncompressed JSONL file is cut
+  into 128 MB pieces at line boundaries (`--chunk-mb`), so one big file uses every
+  `--workers` core; a compressed file is one unit, so `r2-fetch --decompress` first.
+* A new dataset version (files added or deleted) is built with `--reuse-from` the previous
+  version: unchanged files are linked, only new files are tokenized.
+* The tokenizer is trained once on a sample spread over all files and does not change when
+  files do.
+* Training validates every `training.eval_every_steps` (1000) optimizer steps on a fixed
+  sample of `training.eval_windows` (2000) validation windows, and replaces `best.pt` when the
+  loss improves. `--resume` continues from the exact step inside the epoch. `--init-from
+  BEST_PT --run-name NEW` starts a new run on a new dataset version from the old weights.
+* 2 epochs by default, early stop after 5 checks without improvement.
+* `best.pt` uploads go to `ORED_R2_CHECKPOINT_BUCKET` (e.g. `ored-checkpoints`) when set.
+
 ## Storage: R2 for files, Supabase for metadata
 
 Object layout (`src/ored/storage/layout.py`), under the prefix `ored-ai/`:

@@ -6,7 +6,7 @@ import io
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, Iterator, List, Optional, Sequence
+from typing import Any, BinaryIO, Dict, Iterator, List, Optional, Sequence, Tuple
 
 GZIP_MAGIC = b"\x1f\x8b"
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
@@ -113,13 +113,31 @@ def _field(record: Dict[str, Any], dotted: Optional[str]) -> Any:
 class JsonlReader(DatasetReader):
 
     def __init__(self, path: str | Path, text_field: str, id_field: Optional[str] = None,
-                 metadata_fields: Sequence[str] = (), compression: Optional[str] = "detect") -> None:
+                 metadata_fields: Sequence[str] = (), compression: Optional[str] = "detect",
+                 byte_range: Optional[Tuple[int, int]] = None) -> None:
         super().__init__(path, text_field, id_field, metadata_fields)
         self.compression = detect_format(self.path).compression if compression == "detect" else compression
+        if byte_range is not None and self.compression is not None:
+            raise ReaderError(f"{self.path.name} is compressed: it cannot be read in byte ranges")
+        self.byte_range = byte_range
+
+    def _lines(self, handle: BinaryIO) -> Iterator[bytes]:
+        if self.byte_range is None:
+            yield from handle
+            return
+        start, end = self.byte_range
+        handle.seek(start)
+        position = start
+        while position < end:
+            line = handle.readline()
+            if not line:
+                return
+            position += len(line)
+            yield line
 
     def _records(self) -> Iterator[Dict[str, Any]]:
         with _open_binary(self.path, self.compression) as handle:
-            for number, line in enumerate(handle, start=1):
+            for number, line in enumerate(self._lines(handle), start=1):
                 if not line.strip():
                     continue
                 try:
@@ -159,13 +177,38 @@ READERS = {"jsonl": JsonlReader, "parquet": ParquetReader}
 
 
 def open_reader(path: str | Path, text_field: str, id_field: Optional[str] = None,
-                metadata_fields: Sequence[str] = (), file_format: Optional[str] = None) -> DatasetReader:
+                metadata_fields: Sequence[str] = (), file_format: Optional[str] = None,
+                byte_range: Optional[Tuple[int, int]] = None) -> DatasetReader:
     detected = detect_format(path)
     fmt = file_format or detected.format
     if fmt not in READERS:
         raise ReaderError(f"cannot tell how to read {Path(path).name} (detected {detected.describe()}); "
                           f"pass the format explicitly: one of {', '.join(READERS)}")
+    if byte_range is not None:
+        if fmt != "jsonl":
+            raise ReaderError(f"only uncompressed JSONL can be read in byte ranges, not {fmt}")
+        return JsonlReader(path, text_field, id_field, metadata_fields, byte_range=byte_range)
     return READERS[fmt](path, text_field, id_field, metadata_fields)
+
+
+def line_chunks(path: str | Path, chunk_bytes: int) -> List[Tuple[int, int]]:
+    path = Path(path)
+    size = path.stat().st_size
+    if chunk_bytes <= 0 or size <= chunk_bytes:
+        return [(0, size)]
+    starts = [0]
+    with open(path, "rb") as handle:
+        target = chunk_bytes
+        while target < size:
+            handle.seek(target)
+            handle.readline()
+            position = handle.tell()
+            if position >= size:
+                break
+            if position > starts[-1]:
+                starts.append(position)
+            target = position + chunk_bytes
+    return [(a, b) for a, b in zip(starts, starts[1:] + [size])]
 
 
 def file_sha256(path: str | Path, chunk: int = 4 * 1024 * 1024) -> str:

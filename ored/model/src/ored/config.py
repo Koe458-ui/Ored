@@ -259,6 +259,9 @@ class TrainingConfig:
 
     eval_every_epochs: int = 1
     eval_max_batches: int = 0
+    eval_every_steps: int = 0
+    eval_windows: int = 0
+    init_from: str = ""
     log_every_steps: int = 50
 
     def validate(self) -> None:
@@ -270,6 +273,8 @@ class TrainingConfig:
             raise ValueError(f"training.precision must be one of {', '.join(PRECISIONS)}")
         if self.eval_every_epochs < 1:
             raise ValueError("training.eval_every_epochs must be >= 1")
+        if self.eval_every_steps < 0 or self.eval_windows < 0:
+            raise ValueError("training.eval_every_steps and training.eval_windows must be >= 0 (0 = off)")
         if self.eval_max_batches < 0:
             raise ValueError("training.eval_max_batches must be >= 0 (0 = the whole split)")
         if self.log_every_steps < 1:

@@ -4,6 +4,7 @@ import bisect
 import hashlib
 import json
 import os
+import shutil
 import sys
 import time
 from array import array
@@ -25,6 +26,7 @@ MANIFEST = "manifest.json"
 PROGRESS = ".progress.json"
 SPLITS = ("train", "val", "test")
 DEFAULT_MAX_TOKENS_PER_SHARD = 64 * 1024 * 1024
+DEFAULT_CHUNK_BYTES = 128 * 1024 * 1024
 FLUSH_TOKENS = 1 << 20
 
 
@@ -49,7 +51,7 @@ def _code_version() -> Dict[str, Any]:
 class _ShardWriter:
     directory: Path
     split: str
-    unit: int
+    unit: str
     dtype: str
     max_tokens: int
     entries: List[Dict[str, Any]] = field(default_factory=list)
@@ -61,7 +63,7 @@ class _ShardWriter:
     _buffer: Optional[array] = None
 
     def _name(self) -> str:
-        return f"{self.split}/u{self.unit:05d}-{self._index:04d}.bin"
+        return f"{self.split}/{self.unit}-{self._index:04d}.bin"
 
     def _open(self) -> None:
         path = self.directory / self._name()
@@ -118,6 +120,7 @@ class BuildSettings:
     split_seed: int = 1337
     fractions: Dict[str, float] = field(default_factory=lambda: {"train": 0.98, "val": 0.01, "test": 0.01})
     max_tokens_per_shard: int = DEFAULT_MAX_TOKENS_PER_SHARD
+    chunk_bytes: int = DEFAULT_CHUNK_BYTES
 
     def validate(self) -> None:
         if abs(sum(self.fractions.values()) - 1.0) > 1e-6 or set(self.fractions) != set(SPLITS):
@@ -132,11 +135,11 @@ def _group(doc_id: Optional[str], text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def tokenize_unit(unit: int, reader: DatasetReader, tokenizer: Tokenizer, out_dir: Path,
+def tokenize_unit(unit: str, reader: DatasetReader, tokenizer: Tokenizer, out_dir: Path,
                   settings: BuildSettings, eos_id: int,
                   progress: Optional[Callable[[str], None]] = None) -> Dict[str, Any]:
     dtype = dtype_for(tokenizer.vocab_size)
-    for stale in out_dir.glob(f"*/u{unit:05d}-*"):
+    for stale in out_dir.glob(f"*/{unit}-*"):
         stale.unlink()
     writers = {s: _ShardWriter(out_dir, s, unit, dtype, settings.max_tokens_per_shard) for s in SPLITS}
     documents = 0
@@ -187,21 +190,60 @@ def content_sha256(manifest: Dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
-ReaderFactory = Callable[[Path], DatasetReader]
+def unit_signature(tokenizer_sha256: str, settings: BuildSettings, file_format: Optional[str]) -> str:
+    return hashlib.sha256(json.dumps({"tokenizer": tokenizer_sha256, "settings": settings.__dict__,
+                                      "format": file_format}, sort_keys=True).encode()).hexdigest()
 
 
-def _unit_worker(args: Tuple[int, str, Dict[str, Any], str, Dict[str, Any], int, str, Optional[str]]
+def plan_units(sources: List[Dict[str, Any]], paths: Sequence[Path], chunk_bytes: int) -> List[Dict[str, Any]]:
+    from ored.data.readers import line_chunks
+    units = []
+    for index, (source, path) in enumerate(zip(sources, paths)):
+        splittable = source["file_format"] == "jsonl" and source["compression"] is None
+        ranges = line_chunks(path, chunk_bytes) if splittable else [None]
+        for chunk, byte_range in enumerate(ranges):
+            units.append({"key": f"{source['sha256'][:16]}-c{chunk:03d}", "source": index,
+                          "source_sha256": source["sha256"], "byte_range": byte_range})
+    return units
+
+
+def _unit_worker(args: Tuple[Dict[str, Any], str, Dict[str, Any], str, Dict[str, Any], int, Optional[str]]
                  ) -> Dict[str, Any]:
     from ored.data.readers import open_reader
-    unit, path, tokenizer_dict, out_dir, settings_dict, eos_id, fmt, id_field = args
+    unit, path, tokenizer_dict, out_dir, settings_dict, eos_id, fmt = args
     settings = BuildSettings(**settings_dict)
-    reader = open_reader(path, settings.text_field, id_field, file_format=fmt)
-    return tokenize_unit(unit, reader, Tokenizer.from_dict(tokenizer_dict), Path(out_dir), settings, eos_id)
+    byte_range = tuple(unit["byte_range"]) if unit["byte_range"] is not None else None
+    reader = open_reader(path, settings.text_field, settings.id_field, file_format=fmt, byte_range=byte_range)
+    result = tokenize_unit(unit["key"], reader, Tokenizer.from_dict(tokenizer_dict), Path(out_dir), settings,
+                           eos_id)
+    result.update(source_sha256=unit["source_sha256"], byte_range=unit["byte_range"])
+    return result
+
+
+def _link(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.unlink(missing_ok=True)
+    try:
+        os.link(source, target)
+    except OSError:
+        shutil.copy2(source, target)
+
+
+def _reusable_units(reuse_from: Sequence[str | Path], signature: str) -> Dict[str, Tuple[Path, Dict[str, Any]]]:
+    found: Dict[str, Tuple[Path, Dict[str, Any]]] = {}
+    for directory in map(Path, reuse_from):
+        manifest = load_manifest(directory)
+        if manifest.get("unit_signature") != signature:
+            continue
+        for key, unit in (manifest.get("units") or {}).items():
+            found.setdefault(key, (directory, unit))
+    return found
 
 
 def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, tokenizer_info: Dict[str, Any],
                        out_dir: str | Path, settings: BuildSettings, dataset_name: str, dataset_version: str,
                        file_format: Optional[str] = None, workers: int = 1,
+                       reuse_from: Sequence[str | Path] = (),
                        log: Callable[[str], None] = print) -> Dict[str, Any]:
     settings.validate()
     out_dir = Path(out_dir)
@@ -214,29 +256,43 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
         raise ShardError("token shards need a tokenizer with an end-of-text token")
     eos_id = tokenizer.special_id(END_OF_TEXT)
 
-    log(f"hashing {len(sources)} source file(s) ...")
+    paths = [Path(p) for p in sources]
+    log(f"hashing {len(paths)} source file(s) ...")
     from ored.data.readers import detect_format
     described = []
-    for path in map(Path, sources):
+    for path in paths:
         detected = detect_format(path)
         described.append({"file_name": path.name, "size_bytes": path.stat().st_size,
                           "sha256": file_sha256(path), "file_format": file_format or detected.format,
                           "compression": detected.compression})
-    signature = hashlib.sha256(json.dumps({
-        "sources": described, "tokenizer": tokenizer_info["sha256"],
-        "settings": settings.__dict__, "name": dataset_name, "version": dataset_version,
-    }, sort_keys=True).encode()).hexdigest()
-    progress = _read_progress(out_dir, signature)
+    if len({d["sha256"] for d in described}) != len(described):
+        raise ShardError("the same file is listed twice")
+    formats = {d["file_format"] for d in described}
+    signature = unit_signature(tokenizer_info["sha256"], settings, formats.pop() if len(formats) == 1 else None)
+    units = plan_units(described, paths, settings.chunk_bytes)
+    progress = _read_progress(out_dir, hashlib.sha256(json.dumps({
+        "unit_signature": signature, "units": [u["key"] for u in units],
+        "name": dataset_name, "version": dataset_version}, sort_keys=True).encode()).hexdigest())
     _write_json(out_dir / PROGRESS, progress)
 
-    todo = [(i, str(p)) for i, p in enumerate(map(Path, sources)) if str(i) not in progress["units"]]
-    if len(todo) < len(sources):
-        log(f"resuming: {len(sources) - len(todo)} of {len(sources)} unit(s) already done")
-    jobs = [(i, p, tokenizer.to_dict(), str(out_dir), dict(settings.__dict__), eos_id,
-             described[i]["file_format"], settings.id_field) for i, p in todo]
+    reusable = _reusable_units(reuse_from, signature)
+    for unit in units:
+        if unit["key"] in progress["units"] or unit["key"] not in reusable:
+            continue
+        directory, record = reusable[unit["key"]]
+        for shard in record["shards"]:
+            _link(directory / shard["path"], out_dir / shard["path"])
+        progress["units"][unit["key"]] = record
+        _write_json(out_dir / PROGRESS, progress)
+        log(f"unit {unit['key']} reused from {directory}")
+
+    todo = [u for u in units if u["key"] not in progress["units"]]
+    log(f"{len(units)} unit(s): {len(units) - len(todo)} ready, {len(todo)} to tokenize")
+    jobs = [(u, str(paths[u["source"]]), tokenizer.to_dict(), str(out_dir), dict(settings.__dict__), eos_id,
+             described[u["source"]]["file_format"]) for u in todo]
 
     def record(result: Dict[str, Any]) -> None:
-        progress["units"][str(result["unit"])] = result
+        progress["units"][result["unit"]] = result
         _write_json(out_dir / PROGRESS, progress)
         tokens = sum(s["tokens"] for s in result["shards"])
         log(f"unit {result['unit']} done: {result['documents']:,} documents, {tokens:,} tokens, "
@@ -251,22 +307,27 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
         for job in jobs:
             record(_unit_worker(job))
 
-    units = [progress["units"][str(i)] for i in range(len(sources))]
-    shards = [s for u in units for s in u["shards"]]
-    for source, unit in zip(described, units):
-        source.update(documents=unit["documents"], skipped_empty=unit["skipped_empty"],
-                      skipped_invalid_unicode=unit["skipped_invalid_unicode"])
+    done = [progress["units"][u["key"]] for u in units]
+    shards = [s for u in done for s in u["shards"]]
+    for index, source in enumerate(described):
+        mine = [d for u, d in zip(units, done) if u["source"] == index]
+        source.update(documents=sum(d["documents"] for d in mine),
+                      skipped_empty=sum(d["skipped_empty"] for d in mine),
+                      skipped_invalid_unicode=sum(d["skipped_invalid_unicode"] for d in mine))
     manifest: Dict[str, Any] = {
         "format": SHARDS_FORMAT,
         "dataset": {"name": dataset_name, "version": dataset_version, "registry_id": None,
                     "sources": described},
-        "reader": {"text_field": settings.text_field, "id_field": settings.id_field},
+        "reader": {"text_field": settings.text_field, "id_field": settings.id_field,
+                   "chunk_bytes": settings.chunk_bytes},
         "tokenizer": tokenizer_info,
         "dtype": dtype_for(tokenizer.vocab_size),
         "eos_id": eos_id,
         "split": {"seed": settings.split_seed, "fractions": settings.fractions,
                   "unit": "document: id_field when set, else the sha256 of its text"},
         "max_tokens_per_shard": settings.max_tokens_per_shard,
+        "unit_signature": signature,
+        "units": {u["key"]: d for u, d in zip(units, done)},
         "shards": shards,
         "counts": {
             "documents": {s: sum(x["documents"] for x in shards if x["split"] == s) for s in SPLITS},
@@ -276,6 +337,7 @@ def build_token_shards(sources: Sequence[str | Path], tokenizer: Tokenizer, toke
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     manifest["content_sha256"] = content_sha256(manifest)
+    verify_shards(out_dir, manifest, "full" if reusable else "size")
     _write_json(out_dir / MANIFEST, manifest)
     (out_dir / PROGRESS).unlink()
     return manifest
