@@ -60,7 +60,12 @@ def _dataset_directory(cfg: Config, tokenizer_info: Dict[str, Any]) -> Path:
     tokens = cfg.data.tokens
     if tokens.manifest:
         path = Path(tokens.manifest)
-        return path.parent if path.name == "manifest.json" else path
+        directory = path.parent if path.name == "manifest.json" else path
+        if not (directory / "manifest.json").is_file():
+            raise PretrainError(
+                f"no training shards in {directory}: prepare the data first with "
+                f"scripts/corpus.py r2-fetch, then train-tokenizer, then build-shards")
+        return directory
     if tokens.dataset_name and tokens.dataset_version:
         label = f"{tokenizer_info['name']}-{tokenizer_info['version']}"
         directory = Path(tokens.cache_dir) / tokens.dataset_name / tokens.dataset_version / label
@@ -83,6 +88,8 @@ def prepare_token_data(cfg: Config) -> PretrainData:
     if not tokens.tokenizer:
         raise PretrainError("data.tokens.tokenizer must name a tokenizer artifact (scripts/corpus.py "
                             "train-tokenizer writes one); the model never rebuilds its tokenizer")
+    if not Path(tokens.tokenizer).is_file():
+        raise PretrainError(f"no tokenizer at {tokens.tokenizer}: run scripts/corpus.py train-tokenizer first")
     tokenizer, info = load_artifact(tokens.tokenizer)
     if tokenizer.vocab_size != cfg.data.vocab_size:
         raise PretrainError(f"tokenizer {info['name']} {info['version']} has {tokenizer.vocab_size} tokens, "

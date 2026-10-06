@@ -16,12 +16,12 @@ data:
   prefetch_factor: 2
   persistent_workers: true
   tokens:
-    manifest: ""
-    dataset_name: ""
-    dataset_version: ""
+    manifest: data/tokens/training-data/v1
+    dataset_name: training-data
+    dataset_version: v1
     dataset_id: ""
     cache_dir: data/tokens
-    tokenizer: ""
+    tokenizer: data/tokenizers/ored-bpe-16k-v1.json
     verify: full
 
 model:

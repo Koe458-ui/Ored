@@ -7,14 +7,16 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
-from ored.data.readers import ReaderError, file_sha256, inspect_file
+from ored.data.readers import RAW_SUFFIXES, ReaderError, file_sha256, inspect_file
+from ored.storage.layout import DEFAULT_PREFIX
 
 COMPRESSED_SUFFIXES = {".gz": "gzip", ".zst": "zstd", ".zstd": "zstd"}
 
 
 def list_raw(store: Any, prefix: str = "") -> List[Dict[str, Any]]:
     objects = store.list_objects(prefix)
-    return [{"key": key, "size_bytes": size} for key, size in sorted(objects.items()) if not key.endswith("/")]
+    return [{"key": key, "size_bytes": size} for key, size in sorted(objects.items())
+            if key.lower().endswith(RAW_SUFFIXES) and not key.startswith(DEFAULT_PREFIX + "/")]
 
 
 class RangedObject(io.RawIOBase):

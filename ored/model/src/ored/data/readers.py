@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, BinaryIO, Dict, Iterator, List, Optional, Sequence, Tuple
 
+RAW_SUFFIXES = (".jsonl", ".ndjson", ".json", ".jsonl.gz", ".json.gz", ".ndjson.gz", ".jsonl.zst",
+                ".json.zst", ".parquet")
 GZIP_MAGIC = b"\x1f\x8b"
 ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 PARQUET_MAGIC = b"PAR1"
@@ -265,3 +267,66 @@ def _flatten(record: Dict[str, Any], prefix: str = "", depth: int = 2) -> Dict[s
         else:
             out[name] = value
     return out
+
+
+TEXT_NAMES = ("text", "content", "body", "document", "raw_content", "raw_text", "article", "passage")
+ID_NAMES = ("id", "doc_id", "document_id", "docid", "uuid", "_id", "key")
+
+
+def _pick(candidates: Dict[str, float], preferred: Sequence[str]) -> Optional[str]:
+    lowered = {name.lower(): name for name in candidates}
+    for name in preferred:
+        if name in lowered:
+            return lowered[name]
+    if not candidates:
+        return None
+    return max(candidates, key=candidates.get)
+
+
+def detect_fields(path: str | Path, file_format: Optional[str] = None) -> Dict[str, Any]:
+    path = Path(path)
+    detected = detect_format(path)
+    fmt = file_format or detected.format
+    text_sizes: Dict[str, float] = {}
+    id_fields: Dict[str, float] = {}
+    if fmt == "parquet":
+        import pyarrow as pa
+        handle = _pyarrow_parquet(path).ParquetFile(path)
+        meta = handle.metadata
+        sizes: Dict[str, float] = {}
+        for group in range(meta.num_row_groups):
+            row_group = meta.row_group(group)
+            for column in range(row_group.num_columns):
+                chunk = row_group.column(column)
+                sizes[chunk.path_in_schema] = sizes.get(chunk.path_in_schema, 0.0) + chunk.total_uncompressed_size
+        for field in handle.schema_arrow:
+            if pa.types.is_string(field.type) or pa.types.is_large_string(field.type):
+                text_sizes[field.name] = sizes.get(field.name, 0.0)
+            if (pa.types.is_string(field.type) or pa.types.is_large_string(field.type)
+                    or pa.types.is_integer(field.type)):
+                id_fields[field.name] = 0.0
+    elif fmt == "jsonl":
+        records = []
+        with _open_binary(path, detected.compression) as handle:
+            for line in handle:
+                if line.strip():
+                    value = json.loads(line)
+                    if isinstance(value, dict):
+                        records.append(_flatten(value))
+                if len(records) >= 200:
+                    break
+        for record in records:
+            for key, value in record.items():
+                if isinstance(value, str):
+                    text_sizes[key] = text_sizes.get(key, 0.0) + len(value)
+                if isinstance(value, (str, int)) and not isinstance(value, bool):
+                    id_fields[key] = 0.0
+    else:
+        raise ReaderError(f"cannot detect the fields of {path.name}: unknown format {detected.describe()}")
+    text_field = _pick(text_sizes, TEXT_NAMES)
+    if text_field is None:
+        raise ReaderError(f"{path.name} has no text column")
+    lowered = {name.lower(): name for name in id_fields if name != text_field}
+    id_field = next((lowered[n] for n in ID_NAMES if n in lowered), None)
+    return {"text_field": text_field, "id_field": id_field, "file_format": fmt,
+            "text_candidates": sorted(text_sizes, key=text_sizes.get, reverse=True)}

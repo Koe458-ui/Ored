@@ -38,13 +38,12 @@ PART 4 — GET THE DATA READY (your 9 Parquet files in R2)
 
 PART 5 — TRAIN
   19. Measure What Fits on the GPU
-  20. Train
+  20. Train (40 epochs)
   21. Continue Stopped Training
-  22. Keep best.pt in R2 Too
-  23. If It Runs Out of GPU Memory
+  22. If It Runs Out of GPU Memory
 
 PART 6 — NOT THERE YET
-  24. What ored50m Cannot Do Yet
+  23. What ored50m Cannot Do Yet
 
 ---
 
@@ -203,7 +202,7 @@ worse validation loss  → nothing is saved
 
 There is no base.pt, no live.pt, no history\ folder, no epoch_001.pt.
 
-In R2 (step 22) it is, in the ored-checkpoints bucket:
+In R2 (step 20) it is, in the ored-checkpoints bucket:
 
 ored-ai/checkpoints/ored50m/best.pt
 
@@ -258,19 +257,12 @@ Supabase → Ored.ai project → Project Settings → API Keys → Secret key
 PART 4 — GET THE DATA READY (your 9 Parquet files in R2)
 ========================================
 
-Your raw files (9 Parquet files of about 285 MB, about 3 GB in total) stay in
-the ored-datasets bucket. Below:
-
-FOLDER   = the folder they are in, as step 11 shows it (e.g. training data/)
-VERSION  = v1 the first time; v2, v3, ... every time the set of files changes
-
-Use the quotes around FOLDER when it has a space.
+Steps 9 and 10 first (keys). Everything below is already filled in: copy and run.
+The folder, file names, text column and id column are found automatically.
 
 ---
 
 11. See Your Files in R2
-
-Step 9 first.
 
 RUN
 
@@ -278,8 +270,7 @@ python scripts\corpus.py r2-list
 
 OUTPUT
 
-    0.278 GiB  training data/part-00000.parquet
-    0.278 GiB  training data/part-00001.parquet
+    0.278 GiB  training data/....parquet
     ...
 9 file(s), 2.5 GiB in r2://ored-datasets/
 
@@ -289,24 +280,14 @@ OUTPUT
 
 RUN
 
-python scripts\corpus.py r2-inspect "training data/part-00000.parquet"
+python scripts\corpus.py r2-inspect
 
-(use one of the names step 11 printed)
+It opens the first file and downloads only its schema (about 1 MB).
 
 OUTPUT
 
 "file_format": "parquet",
-"parquet_rows": ...,
-"parquet_schema": [
-  "id: string",
-  "text: string",
-  ...
-],
-
-Only the end of the file (its schema) is downloaded, about 1 MB. Write down:
-
-TEXT_FIELD = the field with the document text (above: text)
-ID_FIELD   = the field with the document id (above: id)
+"parquet_schema": [ "id: string", "text: string", ... ]
 
 ---
 
@@ -314,12 +295,10 @@ ID_FIELD   = the field with the document id (above: id)
 
 RUN
 
-python scripts\corpus.py r2-fetch --prefix "training data/" --out data\raw\training-data
+python scripts\corpus.py r2-fetch
 
-Parquet files are used as they are (no unpacking). Files already downloaded are
-skipped, so you can run it again after adding files.
-
-Needs free disk: about 3 GB for the files + about 2–3 GB for the shards (step 15).
+All 9 files go to data\raw\training-data (about 3 GB). Files already there are
+skipped.
 
 ---
 
@@ -327,17 +306,18 @@ Needs free disk: about 3 GB for the files + about 2–3 GB for the shards (step 
 
 RUN
 
-python scripts\corpus.py train-tokenizer --input data\raw\training-data --text-field TEXT_FIELD --vocab-size 16384 --max-bytes 300000000 --name ored-bpe-16k --version v1 --out data\tokenizers\ored-bpe-16k-v1.json
+python scripts\corpus.py train-tokenizer
 
-It learns from a 300 MB sample spread over all files.
+It finds the text column, learns 16,384 tokens from a 300 MB sample of all files
+and writes data\tokenizers\ored-bpe-16k-v1.json.
+
+OUTPUT (start)
+
+text column: text | id column: id
 
 OUTPUT (end)
 
 "vocab_size": 16384,
-"sha256": "<64 letters>"
-
-Keep this file. Every dataset version and every training run uses it.
-Adding or deleting files later does NOT need a new tokenizer.
 
 ---
 
@@ -345,20 +325,16 @@ Adding or deleting files later does NOT need a new tokenizer.
 
 RUN
 
-python scripts\corpus.py build-shards --input data\raw\training-data --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name training-data --version VERSION --out data\tokens\training-data\VERSION --workers 8
+python scripts\corpus.py build-shards
 
---workers = how many CPU cores to use (number of cores minus 1 is fine).
-Each Parquet file is one unit of work, so 9 files keep up to 9 cores busy.
-
-Data split: 99% training, 1% validation, no test part. The validation part is
-what decides which epoch becomes best.pt, so keep it.
+It uses all CPU cores but one and writes data\tokens\training-data\v1.
+99% of the documents are for training, 1% for validation.
+If it stops, run it again: it continues where it stopped.
 
 OUTPUT (end)
 
 "content_sha256": "<64 letters>",
-"counts": { "documents": {...}, "tokens": {"train": ..., "val": ..., "test": ...} }
-
-If it stops, run the same command again: it continues where it stopped.
+"counts": { "documents": {...}, "tokens": {"train": ..., "val": ..., "test": 0} }
 
 ---
 
@@ -366,46 +342,30 @@ If it stops, run the same command again: it continues where it stopped.
 
 RUN
 
-python scripts\corpus.py publish --dir data\tokens\training-data\VERSION --name training-data --version VERSION
+python scripts\corpus.py publish --dir data\tokens\training-data\v1 --name training-data --version v1
 
 ---
 
 17. Register the Dataset in Supabase
 
-Step 10 first. Use the content_sha256 and token count from step 15:
-
 RUN
 
-python scripts\corpus.py register --name training-data --version-label VERSION --bucket ored-datasets --storage-path "training data" --dataset-type pretraining_corpus
-
-python scripts\corpus.py update-registry --name training-data --version-label VERSION --set sha256=CONTENT_SHA256 --set token_count=TRAIN_PLUS_VAL_PLUS_TEST_TOKENS --set status=ready
-
-After status=ready the record can no longer be changed (only deprecated).
+python scripts\corpus.py register --name training-data --version-label v1 --bucket ored-datasets --storage-path "training data" --dataset-type pretraining_corpus
 
 ---
 
 18. When You Add or Delete Files
 
-1. Add or delete the files in the R2 folder.
-2. Make a fresh download folder for the new set (old files are not removed
-   from an existing folder):
+Use v2 (then v3, ...) for the new set of files:
 
-   python scripts\corpus.py r2-fetch --prefix "training data/" --out data\raw\training-data-VERSION --decompress
+RUN
 
-3. Step 15 with the NEW version and --reuse-from the previous one:
+python scripts\corpus.py r2-fetch --out data\raw\training-data-v2
+python scripts\corpus.py build-shards --input data\raw\training-data-v2 --version v2 --reuse-from data\tokens\training-data\v1
+python scripts\corpus.py publish --dir data\tokens\training-data\v2 --name training-data --version v2
+python scripts\pretrain.py --config configs\ored50m.yaml --set data.tokens.manifest=data\tokens\training-data\v2 --set data.tokens.dataset_version=v2 --init-from checkpoints\ored50m\best.pt --run-name ored50m-v2 --set checkpoint.r2_upload=true
 
-   python scripts\corpus.py build-shards --input data\raw\training-data-VERSION --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name training-data --version VERSION --out data\tokens\training-data\VERSION --workers 8 --reuse-from data\tokens\training-data\PREVIOUS_VERSION
-
-   Files that did not change are not tokenized again; only new files are.
-
-4. Steps 16 and 17 with the new VERSION.
-5. Keep training the same model on the new version (set DATA with the new
-   VERSION first, see PART 5):
-
-   python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --init-from checkpoints\ored50m\best.pt --run-name ored50m-VERSION
-
-   It starts from the old model's weights; its own best.pt goes to
-   checkpoints\ored50m-VERSION\. (--resume only works on the same version.)
+Only the new files are tokenized. Training continues from the old best.pt.
 
 ---
 
@@ -413,68 +373,46 @@ After status=ready the record can no longer be changed (only deprecated).
 PART 5 — TRAIN
 ========================================
 
-Every train command below uses the same data settings. Write them once
-(VERSION = the dataset version you built in step 15):
-
-RUN
-
-set DATA=--set data.tokens.manifest=data\tokens\training-data\VERSION --set data.tokens.tokenizer=data\tokenizers\ored-bpe-16k-v1.json --set data.tokens.dataset_name=training-data --set data.tokens.dataset_version=VERSION
-
----
-
 19. Measure What Fits on the GPU
 
 RUN
 
-python scripts\pretrain.py --config configs\ored50m.yaml --probe-batch-size
+python scripts\pretrain.py --probe-batch-size
 
 OUTPUT
 
-{"batch_size": 1, "fits": true, "peak_gib": ..., "tokens_per_second": ...}
-{"batch_size": 2, "fits": true, ...}
 {"batch_size": 4, "fits": true, ...}
 {"batch_size": 6, "fits": false, ...}
 
-The default is batch 4 with 8 accumulation steps (= 32 sequences per step).
-If a bigger batch fits with room to spare, e.g. 8, use half the accumulation:
-
---set data.batch_size=8 --set training.grad_accum_steps=4
+Default: batch 4 x 8 accumulation steps. If 8 fits with room to spare, add
+--set data.batch_size=8 --set training.grad_accum_steps=4 to step 20.
 
 ---
 
-20. Train
+20. Train (40 epochs)
 
 RUN
 
-python scripts\pretrain.py --config configs\ored50m.yaml %DATA%
+python scripts\pretrain.py --set checkpoint.r2_upload=true
+
+It trains ored50m on data\tokens\training-data\v1 for 40 epochs. Every 1000 steps
+it checks the validation loss; when it is better, best.pt is replaced in
+checkpoints\ored50m\ and in R2 (ored-checkpoints bucket).
 
 OUTPUT (start)
 
 PRETRAINING RUN: ored50m (ored50m)
-GPU: NVIDIA GeForce RTX 5060 Laptop GPU ...
 parameters    : 49,894,912
 precision     : bf16
-batch         : micro-batch 4 x 1024 tokens, grad accumulation 8 -> effective 32 sequences = 32,768 tokens per optimizer step
-schedule      : ... steps/epoch, ... total
-dataset       : training-data VERSION (content ...)
+dataset       : training-data v1 (content ...)
 
-Every 1000 steps it checks the validation loss on a fixed sample of 2000
-windows; if it is better, best.pt is replaced:
+It stops early after 5 checks in a row without improvement. To run all 40:
 
-Epoch   1/2 step 1,000 | train loss ... | val loss ... | best ... | ... tok/s | peak ... GiB  <- new best.pt
+python scripts\pretrain.py --set checkpoint.r2_upload=true --set training.early_stopping_patience=0
 
-It trains 40 epochs (40 passes over the data). For 20 epochs:
+For 20 epochs instead:
 
---set training.epochs=20
-
-It stops early after 5 checks in a row (5,000 steps) without a better
-validation loss, because by then the model is memorising, not learning; best.pt
-keeps the best point. To never stop early:
-
---set training.early_stopping_patience=0
-
-How long: the start of the run prints "schedule : ... steps/epoch" and the
-log prints tok/s. Hours per epoch = steps/epoch x 32,768 / tok/s / 3600.
+python scripts\pretrain.py --set checkpoint.r2_upload=true --set training.epochs=20
 
 ---
 
@@ -482,43 +420,17 @@ log prints tok/s. Hours per epoch = steps/epoch x 32,768 / tok/s / 3600.
 
 RUN
 
-python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --resume
-
-It continues from the step saved in best.pt, inside the same epoch.
-Steps trained after the last best.pt are trained again.
+python scripts\pretrain.py --set checkpoint.r2_upload=true --resume
 
 ---
 
-22. Keep best.pt in R2 Too
-
-Step 9 first. Add this to the train command:
-
---set checkpoint.r2_upload=true
+22. If It Runs Out of GPU Memory
 
 RUN
 
-python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --set checkpoint.r2_upload=true
+python scripts\pretrain.py --set checkpoint.r2_upload=true --set data.batch_size=2 --set training.grad_accum_steps=16
 
-Every new best.pt replaces ored-ai/checkpoints/ored50m/best.pt in the
-ored-checkpoints bucket. Only one copy is ever kept.
-
----
-
-23. If It Runs Out of GPU Memory
-
-The run stops with:
-
-CUDA ran out of memory with micro-batch ...
-
-best.pt is not touched. Then either:
-
---set data.batch_size=2 --set training.grad_accum_steps=16
-
-or:
-
---set model.gradient_checkpointing=true
-
-and run step 20 again (or step 21 to continue).
+best.pt is never damaged by a crash.
 
 ---
 
@@ -526,7 +438,7 @@ and run step 20 again (or step 21 to continue).
 PART 6 — NOT THERE YET
 ========================================
 
-24. What ored50m Cannot Do Yet
+23. What ored50m Cannot Do Yet
 
 - Train on many PCs.
 - Answer questions (scripts\infer.py / scripts\generate.py read the old

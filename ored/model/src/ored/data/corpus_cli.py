@@ -2,15 +2,40 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Tuple
 
 from ored.data.readers import detect_format, file_sha256, inspect_file, open_reader
 
 
-RAW_SUFFIXES = (".jsonl", ".ndjson", ".json", ".jsonl.gz", ".json.gz", ".ndjson.gz", ".jsonl.zst",
-                ".json.zst", ".parquet")
+from ored.data.readers import RAW_SUFFIXES
+
+RAW_DIR = "data/raw/training-data"
+TOKENIZER_NAME = "ored-bpe-16k"
+TOKENIZER_VERSION = "v1"
+TOKENIZER_PATH = f"data/tokenizers/{TOKENIZER_NAME}-{TOKENIZER_VERSION}.json"
+DATASET_NAME = "training-data"
+DATASET_VERSION = "v1"
+DEFAULT_WORKERS = max(1, (os.cpu_count() or 2) - 1)
+
+
+def _fields(args: argparse.Namespace, files: List[str]) -> Tuple[str, Optional[str]]:
+    from ored.data.readers import detect_fields
+
+    no_id = getattr(args, "no_id_field", False)
+    if args.text_field and (getattr(args, "id_field", None) or no_id):
+        return args.text_field, None if no_id else args.id_field
+    found = [detect_fields(f, args.format) for f in files]
+    text = args.text_field or found[0]["text_field"]
+    ids = None if no_id else (getattr(args, "id_field", None) or found[0]["id_field"])
+    for path, info in zip(files, found):
+        if text not in info["text_candidates"]:
+            raise SystemExit(f"{Path(path).name} has no text column {text!r} (it has {info['text_candidates']})")
+    print(f"text column: {text} | id column: {ids or 'none (documents are identified by their text)'}",
+          file=sys.stderr)
+    return text, ids
 
 
 def _expand(inputs: List[str]) -> List[str]:
@@ -54,6 +79,7 @@ def cmd_train_tokenizer(args: argparse.Namespace) -> int:
     from ored.data.tokenizer_artifact import save_artifact
 
     args.input = _expand(args.input)
+    args.text_field, _ = _fields(args, args.input)
     texts = _documents(args.input, args.text_field, None, args.format, args.max_documents, args.max_bytes)
     words, seen = count_words(texts)
     print(f"{len(words):,} distinct pre-tokenized words; learning merges ...", file=sys.stderr)
@@ -71,12 +97,15 @@ def cmd_build_shards(args: argparse.Namespace) -> int:
     from ored.data.tokenizer_artifact import load_artifact
 
     tokenizer, info = load_artifact(args.tokenizer)
+    files = _expand(args.input)
+    text_field, id_field = _fields(args, files)
+    args.out = args.out or f"data/tokens/{args.name}/{args.version}"
     train = 1.0 - args.val_fraction - args.test_fraction
-    settings = BuildSettings(text_field=args.text_field, id_field=args.id_field, split_seed=args.split_seed,
+    settings = BuildSettings(text_field=text_field, id_field=id_field, split_seed=args.split_seed,
                              fractions={"train": train, "val": args.val_fraction, "test": args.test_fraction},
                              max_tokens_per_shard=args.max_tokens_per_shard,
                              chunk_bytes=args.chunk_mb * 1024 * 1024)
-    manifest = build_token_shards(_expand(args.input), tokenizer, info, args.out, settings, args.name,
+    manifest = build_token_shards(files, tokenizer, info, args.out, settings, args.name,
                                   args.version, file_format=args.format, workers=args.workers,
                                   reuse_from=args.reuse_from, log=lambda m: print(m, file=sys.stderr))
     print(json.dumps({"content_sha256": manifest["content_sha256"], "counts": manifest["counts"],
@@ -101,7 +130,14 @@ def cmd_r2_inspect(args: argparse.Namespace) -> int:
     from ored.storage import R2Settings
     from ored.storage.raw import inspect_object
 
+    from ored.storage.raw import list_raw
+
     store = R2Settings.from_env().store()
+    if not args.keys:
+        found = list_raw(store)
+        if not found:
+            raise SystemExit("no .parquet / .jsonl data files in the bucket")
+        args.keys = [found[0]["key"]]
     for key in args.keys:
         print(json.dumps(inspect_object(store, key, args.head_mb * 1024 * 1024), indent=2))
     return 0
@@ -254,27 +290,28 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.set_defaults(func=cmd_inspect)
 
     p = sub.add_parser("train-tokenizer")
-    p.add_argument("--input", nargs="+", required=True)
-    p.add_argument("--text-field", required=True)
+    p.add_argument("--input", nargs="+", default=[RAW_DIR])
+    p.add_argument("--text-field", help="detected automatically when left out")
     p.add_argument("--format", choices=["jsonl", "parquet"])
     p.add_argument("--vocab-size", type=int, default=16384)
     p.add_argument("--max-documents", type=int, default=0)
-    p.add_argument("--max-bytes", type=int, default=0, help="train on a sample of this many bytes")
-    p.add_argument("--name", required=True)
-    p.add_argument("--version", required=True)
-    p.add_argument("--out", required=True)
+    p.add_argument("--max-bytes", type=int, default=300_000_000, help="train on a sample of this many bytes")
+    p.add_argument("--name", default=TOKENIZER_NAME)
+    p.add_argument("--version", default=TOKENIZER_VERSION)
+    p.add_argument("--out", default=TOKENIZER_PATH)
     p.set_defaults(func=cmd_train_tokenizer)
 
     p = sub.add_parser("build-shards")
-    p.add_argument("--input", nargs="+", required=True)
-    p.add_argument("--text-field", required=True)
-    p.add_argument("--id-field")
+    p.add_argument("--input", nargs="+", default=[RAW_DIR])
+    p.add_argument("--text-field", help="detected automatically when left out")
+    p.add_argument("--id-field", help="detected automatically when left out")
+    p.add_argument("--no-id-field", action="store_true", help="identify documents by their text")
     p.add_argument("--format", choices=["jsonl", "parquet"])
-    p.add_argument("--tokenizer", required=True, help="tokenizer artifact (train-tokenizer --out)")
-    p.add_argument("--name", required=True)
-    p.add_argument("--version", required=True)
-    p.add_argument("--out", required=True)
-    p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--tokenizer", default=TOKENIZER_PATH, help="tokenizer artifact (train-tokenizer --out)")
+    p.add_argument("--name", default=DATASET_NAME)
+    p.add_argument("--version", default=DATASET_VERSION)
+    p.add_argument("--out", help="default data/tokens/NAME/VERSION")
+    p.add_argument("--workers", type=int, default=DEFAULT_WORKERS)
     p.add_argument("--split-seed", type=int, default=1337)
     p.add_argument("--val-fraction", type=float, default=0.01)
     p.add_argument("--test-fraction", type=float, default=0.0)
@@ -290,13 +327,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.set_defaults(func=cmd_r2_list)
 
     p = sub.add_parser("r2-inspect")
-    p.add_argument("keys", nargs="+")
+    p.add_argument("keys", nargs="*", help="default: the first data file in the bucket")
     p.add_argument("--head-mb", type=int, default=8)
     p.set_defaults(func=cmd_r2_inspect)
 
     p = sub.add_parser("r2-fetch")
-    p.add_argument("--prefix", required=True)
-    p.add_argument("--out", required=True)
+    p.add_argument("--prefix", default="", help="default: every data file in the bucket")
+    p.add_argument("--out", default=RAW_DIR)
     p.add_argument("--decompress", action="store_true",
                    help="unpack .gz / .zst after download, so big files can be split across workers")
     p.set_defaults(func=cmd_r2_fetch)

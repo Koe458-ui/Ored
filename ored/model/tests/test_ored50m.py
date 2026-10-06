@@ -521,7 +521,14 @@ def test_pretrain_refuses_a_mismatched_tokenizer(shards, tmp_path, tokenizer):
 def test_pretrain_without_a_dataset_says_so(tmp_path, artifact):
     cfg = load_config(CONFIG_50M, [f"data.tokens.tokenizer={artifact}", "data.vocab_size=320",
                                    "training.device=cpu"])
+    with pytest.raises(PretrainError, match="no training shards in"):
+        PretrainTrainer(cfg)
+    cfg.data.tokens.manifest = ""
+    cfg.data.tokens.dataset_name = ""
     with pytest.raises(PretrainError, match="no training dataset is configured"):
+        PretrainTrainer(cfg)
+    cfg.data.tokens.tokenizer = str(tmp_path / "missing.json")
+    with pytest.raises(PretrainError, match="run scripts/corpus.py train-tokenizer"):
         PretrainTrainer(cfg)
 
 
@@ -719,3 +726,35 @@ def test_ored50m_trains_forty_epochs_without_a_test_split(capsys):
     with pytest.raises(SystemExit):
         corpus_cli.main(["build-shards", "--help"])
     assert "--test-fraction" in capsys.readouterr().out
+
+
+def test_defaults_need_nothing_filled_in(tmp_path, r2, monkeypatch, capsys):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from ored.data import corpus_cli
+    from ored.data.readers import detect_fields
+    from ored.storage.raw import fetch_raw, list_raw
+
+    rows = [{"id": f"d{i}", "source": "web", "text": " ".join(WORDS[(i + j) % len(WORDS)] for j in range(60)),
+             "metadata": {"license": "cc-by"}} for i in range(150)]
+    for part in range(2):
+        path = tmp_path / f"part-{part}.parquet"
+        pq.write_table(pa.Table.from_pylist(rows[part * 75:(part + 1) * 75]), path)
+        r2.upload(path, f"training data/{path.name}")
+    r2.upload(write_jsonl(tmp_path / "manifest.json", [{"x": 1}]), "ored-ai/datasets/x/v1/manifest.json")
+    assert [i["key"] for i in list_raw(r2)] == ["training data/part-0.parquet", "training data/part-1.parquet"]
+    fetch_raw(r2, "", tmp_path / "data/raw/training-data", log=lambda m: None)
+    assert detect_fields(tmp_path / "data/raw/training-data/part-0.parquet")["text_field"] == "text"
+
+    monkeypatch.chdir(tmp_path)
+    assert corpus_cli.main(["train-tokenizer", "--vocab-size", "300"]) == 0
+    assert corpus_cli.main(["build-shards", "--workers", "1"]) == 0
+    assert "text column: text | id column: id" in capsys.readouterr().err
+    manifest = load_manifest(tmp_path / "data/tokens/training-data/v1")
+    assert manifest["reader"] == {"text_field": "text", "id_field": "id", "chunk_bytes": 128 * 1024 * 1024}
+    cfg = load_config(CONFIG_50M, ["data.vocab_size=300", "model.expected_parameters=0", "model.d_model=32",
+                                   "model.n_layer=1", "model.n_head=4", "model.d_ff=64", "data.block_size=32",
+                                   "data.stride=32", "data.num_workers=0", "data.persistent_workers=false",
+                                   "training.device=cpu", "training.epochs=1", "training.eval_every_steps=0"])
+    trainer = PretrainTrainer(cfg)
+    assert trainer.data.identity["name"] == "training-data" and len(trainer.data.train) > 0
