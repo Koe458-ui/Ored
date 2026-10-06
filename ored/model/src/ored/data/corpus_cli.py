@@ -277,7 +277,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--split-seed", type=int, default=1337)
     p.add_argument("--val-fraction", type=float, default=0.01)
-    p.add_argument("--test-fraction", type=float, default=0.01)
+    p.add_argument("--test-fraction", type=float, default=0.0)
     p.add_argument("--max-tokens-per-shard", type=int, default=64 * 1024 * 1024)
     p.add_argument("--chunk-mb", type=int, default=128,
                    help="split uncompressed JSONL files into pieces of this size, one per worker")

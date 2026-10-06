@@ -168,8 +168,7 @@ def _pyarrow_parquet(path: Path) -> Any:
     try:
         import pyarrow.parquet as parquet
     except ImportError as exc:
-        raise ReaderError(f"{path.name} is Parquet: pip install pyarrow "
-                          f"(optional dependency, see pyproject extras 'corpus')") from exc
+        raise ReaderError(f"{path.name} is Parquet: install pyarrow (pip install -r requirements.txt)") from exc
     return parquet
 
 

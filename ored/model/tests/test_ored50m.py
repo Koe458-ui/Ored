@@ -654,3 +654,68 @@ def test_init_from_starts_a_new_run_on_another_dataset_version(shards, tmp_path,
     second.fit()
     payload = torch.load(Path(cfg.checkpoint_dir) / "best.pt", weights_only=True)
     assert payload["initialised_from"]["path"] == str(best) and payload["dataset"]["version"] == "v2"
+
+
+def write_parquet(path: Path, records, row_group_size: int = 50) -> Path:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    pq.write_table(pa.Table.from_pylist(records), path, row_group_size=row_group_size)
+    return path
+
+
+def test_parquet_files_inspect_over_r2_and_build_one_unit_each(tmp_path, r2, tokenizer, artifact):
+    files = [write_parquet(tmp_path / f"part-{i:05d}.parquet", synthetic_docs(120, 10 + i, f"p{i}"))
+             for i in range(3)]
+    for f in files:
+        r2.upload(f, f"training data/{f.name}")
+    from ored.storage.raw import inspect_object, fetch_raw
+
+    report = inspect_object(r2, "training data/part-00000.parquet")
+    assert report["file_format"] == "parquet" and report["parquet_rows"] == 120
+    assert {"body", "meta", "extra"} <= set(report["fields"])
+    fetched = fetch_raw(r2, "training data/", tmp_path / "raw", log=lambda m: None)
+    assert [Path(f["path"]).name for f in fetched] == [f.name for f in files]
+
+    docs = list(open_reader(tmp_path / "raw" / "part-00001.parquet", "body", id_field="meta.uid"))
+    assert len(docs) == 120 and docs[0].id == "p1-0"
+
+    _, info = load_artifact(artifact)
+    settings = BuildSettings(text_field="body", id_field="meta.uid", max_tokens_per_shard=4096,
+                             fractions={"train": 0.99, "val": 0.01, "test": 0.0})
+    manifest = build_token_shards(sorted((tmp_path / "raw").iterdir()), tokenizer, info, tmp_path / "s",
+                                  settings, "training-data", "v1", workers=3, log=lambda m: None)
+    assert len(manifest["units"]) == 3 and manifest["counts"]["documents"]["test"] == 0
+    assert sum(manifest["counts"]["documents"].values()) == 360
+
+
+def test_parquet_inspection_reads_only_the_footer(tmp_path, r2):
+    from ored.storage.raw import inspect_object
+
+    big = write_parquet(tmp_path / "big.parquet", synthetic_docs(6000, 4, "b"), row_group_size=500)
+    r2.upload(big, "training data/big.parquet")
+    report = inspect_object(r2, "training data/big.parquet")
+    assert report["parquet_row_groups"] == 12 and report["downloaded_bytes"] < big.stat().st_size
+
+
+def test_tokenizer_trains_from_a_parquet_folder(tmp_path):
+    from ored.data.corpus_cli import main
+
+    folder = tmp_path / "raw"
+    folder.mkdir()
+    for i in range(2):
+        write_parquet(folder / f"part-{i}.parquet", synthetic_docs(100, 20 + i, f"t{i}"))
+    out = tmp_path / "tok.json"
+    assert main(["train-tokenizer", "--input", str(folder), "--text-field", "body", "--vocab-size", "300",
+                 "--name", "t", "--version", "v1", "--out", str(out)]) == 0
+    tokenizer, info = load_artifact(out)
+    assert info["vocab_size"] == tokenizer.vocab_size and len(info["sha256"]) == 64
+
+
+def test_ored50m_trains_forty_epochs_without_a_test_split(capsys):
+    from ored.data import corpus_cli
+
+    assert load_config(CONFIG_50M).training.epochs == 40
+    with pytest.raises(SystemExit):
+        corpus_cli.main(["build-shards", "--help"])
+    assert "--test-fraction" in capsys.readouterr().out

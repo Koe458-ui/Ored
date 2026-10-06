@@ -17,7 +17,60 @@ def list_raw(store: Any, prefix: str = "") -> List[Dict[str, Any]]:
     return [{"key": key, "size_bytes": size} for key, size in sorted(objects.items()) if not key.endswith("/")]
 
 
+class RangedObject(io.RawIOBase):
+
+    def __init__(self, store: Any, key: str, size: int) -> None:
+        self.store = store
+        self.key = key
+        self.size = size
+        self.position = 0
+        self.fetched = 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self.position
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self.position, io.SEEK_END: self.size}[whence]
+        self.position = max(0, min(self.size, base + offset))
+        return self.position
+
+    def readinto(self, buffer: Any) -> int:
+        length = min(len(buffer), self.size - self.position)
+        if length <= 0:
+            return 0
+        data = self.store.read_range(self.key, self.position, length)
+        buffer[:len(data)] = data
+        self.position += len(data)
+        self.fetched += len(data)
+        return len(data)
+
+
+def inspect_parquet_object(store: Any, key: str, size: int) -> Dict[str, Any]:
+    try:
+        import pyarrow.parquet as parquet
+    except ImportError as exc:
+        raise ReaderError("reading Parquet needs pyarrow: pip install -r requirements.txt") from exc
+    source = RangedObject(store, key, size)
+    meta = parquet.ParquetFile(io.BufferedReader(source, buffer_size=1024 * 1024))
+    schema = meta.schema_arrow
+    return {"key": key, "file_name": Path(key).name, "size_bytes": size, "file_format": "parquet",
+            "compression": None, "parquet_rows": meta.metadata.num_rows,
+            "parquet_row_groups": meta.metadata.num_row_groups,
+            "parquet_schema": [f"{f.name}: {f.type}" for f in schema],
+            "fields": {f.name: [str(f.type)] for f in schema},
+            "downloaded_bytes": source.fetched}
+
+
 def inspect_object(store: Any, key: str, head_bytes: int = 8 * 1024 * 1024) -> Dict[str, Any]:
+    size = store.stat(key)
+    if store.read_head(key, 4) == b"PAR1":
+        return inspect_parquet_object(store, key, size)
     with tempfile.TemporaryDirectory() as tmp:
         local = Path(tmp) / Path(key).name
         local.write_bytes(store.read_head(key, head_bytes))
@@ -26,7 +79,7 @@ def inspect_object(store: Any, key: str, head_bytes: int = 8 * 1024 * 1024) -> D
         except (EOFError, OSError, ReaderError) as exc:
             report = {"file_name": local.name, "error": f"could not read the first {head_bytes} bytes: {exc}"}
     report["key"] = key
-    report["size_bytes"] = store.stat(key)
+    report["size_bytes"] = size
     report["sampled_bytes"] = head_bytes
     return report
 

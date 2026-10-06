@@ -96,9 +96,8 @@ python scripts/corpus.py build-shards --input FILE [FILE ...] --text-field <fiel
 ```
 
 * Readers (`src/ored/data/readers.py`): `DatasetReader` -> `JsonlReader` (`.jsonl`,
-  `.jsonl.gz`; `.jsonl.zst` with `zstandard`) and `ParquetReader` (with `pyarrow`). The
-  two optional packages are listed under the `corpus` extra in `pyproject.toml` and are not
-  installed by default. Format is detected from magic bytes, then the file name.
+  `.jsonl.gz`; `.jsonl.zst` with `zstandard`) and `ParquetReader` (with `pyarrow`, a required
+  dependency). `zstandard` is optional (the `corpus` extra in `pyproject.toml`). Format is detected from magic bytes, then the file name.
 * Shards (`src/ored/data/token_shards.py`): flat little-endian uint16 token ids, each
   document followed by `<|endoftext|>`. Documents are split train/val/test by a hash of
   their id (or of their text when there is no id field), so the split does not depend on
@@ -126,7 +125,8 @@ The raw files live in the `ored-datasets` bucket, in any folder (`scripts/corpus
   sample of `training.eval_windows` (2000) validation windows, and replaces `best.pt` when the
   loss improves. `--resume` continues from the exact step inside the epoch. `--init-from
   BEST_PT --run-name NEW` starts a new run on a new dataset version from the old weights.
-* 2 epochs by default, early stop after 5 checks without improvement.
+* 40 epochs by default, early stop after 5 checks without improvement; no test split
+  (`--test-fraction 0`), 1% validation.
 * `best.pt` uploads go to `ORED_R2_CHECKPOINT_BUCKET` (e.g. `ored-checkpoints`) when set.
 
 ## Storage: R2 for files, Supabase for metadata
