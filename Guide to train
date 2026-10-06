@@ -69,6 +69,13 @@ OUTPUT
 
 The version it will show should match with GitHub Ored.ai last merged version.
 
+Then turn on the secret guard (once per clone). It stops any commit that
+contains a key:
+
+RUN
+
+git config core.hooksPath .githooks
+
 ---
 
 2. Virtual Environment

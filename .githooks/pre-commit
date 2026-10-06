@@ -1,0 +1,8 @@
+#!/bin/sh
+PY=$(command -v python3 || command -v python)
+FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$FILES" ] && exit 0
+echo "$FILES" | tr '\n' '\0' | xargs -0 "$PY" "$(git rev-parse --show-toplevel)/.github/scripts/check_secrets.py" || {
+  echo "Commit blocked: remove the secret above (keys belong in environment variables)."
+  exit 1
+}

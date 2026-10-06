@@ -308,22 +308,22 @@ def test_corrupted_shard_is_detected(shards):
         verify_shards(out, manifest, "full")
 
 
-ENV = {"ORED_R2_ACCOUNT_ID": "acct123", "ORED_R2_ACCESS_KEY_ID": "AKIA-SECRET-ID",
-       "ORED_R2_SECRET_ACCESS_KEY": "very-secret-value", "ORED_R2_BUCKET": "ored-ai-data"}
+ENV = {"ORED_R2_ACCOUNT_ID": "acct123", "ORED_R2_ACCESS_KEY_ID": "test-access-key-id",
+       "ORED_R2_SECRET_ACCESS_KEY": "test-secret-access-key", "ORED_R2_BUCKET": "ored-ai-data"}
 
 
 def test_r2_settings_never_show_secrets():
     settings = R2Settings.from_env(ENV)
     shown = repr(settings) + json.dumps(settings.describe())
-    for secret in ("AKIA-SECRET-ID", "very-secret-value", "acct123"):
+    for secret in ("test-access-key-id", "test-secret-access-key", "acct123"):
         assert secret not in shown
     assert settings.prefix == "ored-ai" and settings.store().bucket == "ored-ai-data"
     assert settings.checkpoint_store().bucket == "ored-ai-data"
     split = R2Settings.from_env({**ENV, "ORED_R2_CHECKPOINT_BUCKET": "ored-checkpoints"})
     assert split.checkpoint_store().bucket == "ored-checkpoints" and split.store().bucket == "ored-ai-data"
     with pytest.raises(StorageConfigError) as missing:
-        R2Settings.from_env({"ORED_R2_SECRET_ACCESS_KEY": "very-secret-value"})
-    assert "ORED_R2_BUCKET" in str(missing.value) and "very-secret-value" not in str(missing.value)
+        R2Settings.from_env({"ORED_R2_SECRET_ACCESS_KEY": "test-secret-access-key"})
+    assert "ORED_R2_BUCKET" in str(missing.value) and "test-secret-access-key" not in str(missing.value)
     assert not R2Settings.configured({})
 
 
