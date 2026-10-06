@@ -1,5 +1,9 @@
 # Distributed Training
 
+> **Removed model.** This page describes the ~5.13M `char_transformer`, which was replaced by
+> ored50m. `configs/char_transformer.yaml` no longer exists, so the commands below that use it
+> do not run. To train, see `Guide to train` and [`docs/ored50m.md`](ored50m.md).
+
 Train **one** Ored model on 2, 3, 10 or 20 PCs at the same time.
 
 This is real data-parallel training with PyTorch's own tools: `torchrun`

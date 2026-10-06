@@ -535,6 +535,9 @@ class Trainer:
 
 
 def train(cfg: Config, ensure_dataset: bool = True) -> Dict[str, Any]:
+    if cfg.data.source == "tokens":
+        from ored.training.pretrain import PretrainTrainer
+        return PretrainTrainer(cfg).fit()
     if cfg.data.source == "supabase":
         from ored.training.dataset_run import run_supabase_training
         return run_supabase_training(cfg)

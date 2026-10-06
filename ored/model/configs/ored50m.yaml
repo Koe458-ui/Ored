@@ -1,0 +1,81 @@
+run_name: ored50m
+task: language_model
+seed: 1337
+deterministic: false
+
+data:
+  source: tokens
+  tokenizer: subword
+  vocab_size: 16384
+  block_size: 1024
+  stride: 1024
+  batch_size: 4
+  shuffle_train: true
+  num_workers: 2
+  pin_memory: true
+  prefetch_factor: 2
+  persistent_workers: true
+  tokens:
+    manifest: ""
+    dataset_name: ""
+    dataset_version: ""
+    dataset_id: ""
+    cache_dir: data/tokens
+    tokenizer: ""
+    verify: full
+
+model:
+  name: transformer
+  version: ored50m
+  d_model: 512
+  n_layer: 13
+  n_head: 8
+  d_ff: 2048
+  dropout: 0.1
+  tie_weights: true
+  attention: sdpa
+  gradient_checkpointing: false
+  expected_parameters: 49894912
+
+training:
+  epochs: 40
+  learning_rate: 0.0003
+  optimizer: adamw
+  weight_decay: 0.1
+  loss: cross_entropy
+  scheduler: cosine
+  warmup_steps: 1000
+  min_lr_ratio: 0.1
+  grad_clip: 1.0
+  grad_accum_steps: 8
+  precision: auto
+  compile: false
+  tf32: true
+  early_stopping_patience: 5
+  eval_every_epochs: 1
+  eval_max_batches: 0
+  eval_every_steps: 1000
+  eval_windows: 2000
+  log_every_steps: 50
+  device: auto
+  resume: ""
+
+checkpoint:
+  policy: best_only
+  best_metric: val_loss
+  best_mode: min
+  save_base: false
+  save_live_every_epochs: 0
+  keep_history: false
+  upload: false
+  r2_upload: false
+
+generation:
+  max_new_tokens: 400
+  temperature: 0.8
+  top_k: 0
+  top_p: 0.0
+  prompt: ""
+
+paths:
+  checkpoint_dir: checkpoints

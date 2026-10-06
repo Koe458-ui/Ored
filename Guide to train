@@ -2,6 +2,10 @@ Ored AI — Re-enter AI Training Mode
 
 You will starts from "C:\Users\username" (change username to your name).
 
+The model is ored50m: about 50 million parameters (49,894,912), config
+configs\ored50m.yaml. The old char_transformer model is gone; no command in this
+guide uses it.
+
 ---
 
 CONTENTS
@@ -14,54 +18,33 @@ PART 1 — SET UP (every PC)
   5. If CUDA Is False
   6. Check the Code Is Sound
 
-PART 2 — CHECKPOINTS: WHAT THEY ARE
-  7. Checkpoint Types
-  8. Checkpoint Structure
-  9. Recover Your Old Checkpoints From Database
+PART 2 — THE MODEL AND ITS CHECKPOINT
+  7. What ored50m Is
+  8. The Checkpoint: best.pt Only
 
-PART 3 — TRAIN ON ONE PC
-  10. Train
-  11. Start Training From Another Checkpoint
-  12. Continue Stopped Training
+PART 3 — KEYS
+  9. Set Your R2 Keys
+  10. Set Your Supabase Keys
 
-PART 4 — MANAGE CHECKPOINTS
-  13. Add Checkpoint as BEST
-  14. Add Checkpoint as LIVE
-  15. Add Checkpoint to HISTORY
-  16. Add Checkpoint as BASE
-  17. Merge LIVE Into BEST
-  18. Checkpoints From the Command Prompt
+PART 4 — GET THE DATA READY (your 9 Parquet files in R2)
+  11. See Your Files in R2
+  12. Look Inside a File
+  13. Download the Files
+  14. Train the Tokenizer (once)
+  15. Build the Training Shards
+  16. Upload the Shards to R2
+  17. Register the Dataset in Supabase
+  18. When You Add or Delete Files
 
-PART 5 — AFTER TRAINING
-  19. After Done Training — Ask Questions
-  20. After Asking Questions — Add Checkpoint
+PART 5 — TRAIN
+  19. Measure What Fits on the GPU
+  20. Train
+  21. Continue Stopped Training
+  22. Keep best.pt in R2 Too
+  23. If It Runs Out of GPU Memory
 
-PART 6 — TRAIN ON MANY PCS
-  21. Many PCs — What It Is
-  22. Important — Many PCs
-  23. Before You Start — On EVERY PC
-  24. Connect the PCs
-  25. Check the PCs Can Talk
-  26. Train on Many PCs
-  27. See It on Your Phone (Supabase)
-  28. Continue Stopped Training — Many PCs
-  29. Add Another PC
-  30. If One PC Crashes
-  31. Check a Checkpoint
-  32. After Done Training — Ask Questions (Many PCs)
-  33. Checkpoint Structure — Many PCs
-
-PART 7 — TRAIN ON YOUR OWN DATA IN SUPABASE
-  34. Supabase Data — What It Is
-  35. Set Your Supabase Keys
-  36. See What Data Is There
-  37. Add Training Data
-  38. Train on Supabase Data
-  39. Continue Stopped Training — Supabase Data
-  40. Train Again After Adding New Data
-  41. Ask Questions — Supabase Data
-  42. Which Data Made This Checkpoint?
-  43. Supabase Data on Many PCs
+PART 6 — NOT THERE YET
+  24. What ored50m Cannot Do Yet
 
 ---
 
@@ -86,14 +69,12 @@ OUTPUT
 
 The version it will show should match with GitHub Ored.ai last merged version.
 
-PART 7 (Supabase data) needs the training-data update. Until it is merged into
-Ored.ai, use its branch instead:
+Then turn on the secret guard (once per clone). It stops any commit that
+contains a key:
 
 RUN
 
-git fetch origin
-git checkout albaze777/supabase-training-pipeline-efqpgi
-git pull
+git config core.hooksPath .githooks
 
 ---
 
@@ -180,661 +161,82 @@ The number should be up to date. Check otherwise.
 ---
 
 ========================================
-PART 2 — CHECKPOINTS: WHAT THEY ARE
+PART 2 — THE MODEL AND ITS CHECKPOINT
 ========================================
 
-7. Checkpoint Types
-
-Checkpoint| Meaning
-"base.pt"| Starting checkpoint of the training run
-"best.pt"| Best checkpoint based on validation loss
-"live.pt"| Latest checkpoint that can continue training
-"history/"| Old checkpoints kept as backups
-
-Lower validation loss = better checkpoint.
-
----
-
-8. Checkpoint Structure
-
-checkpoints/
-│
-├── ored_v2/
-│   ├── base.pt
-│   ├── best.pt
-│   └── live.pt
-│
-└── history/
-
-Meaning
-
-base.pt   = starting checkpoint
-best.pt   = best validation checkpoint
-live.pt   = latest resumable checkpoint
-history/  = old checkpoint backups
-
----
-
-9. Recover Your Old Checkpoints From Database
-
-Set your Supabase credentials:
-
-set ORED_SB_URL=https://xoauguhlxjozpvukjtro.supabase.co
-set ORED_SB_SERVICE_KEY=YOUR_SECRET_KEY
-
-«Do not put the real service key in GitHub.»
-
-Check available checkpoints
-
-python scripts\checkpoints.py list
-
-Pull a checkpoint
-
-python scripts\checkpoints.py pull checkpoints\char_transformer_v2\best.pt --kind best --run-name char_transformer_v2
-
----
-
-========================================
-PART 3 — TRAIN ON ONE PC
-========================================
-
-10. Train
-
-Training reads your rows in Supabase (table "ored_training_data", PART 7).
-That is the default of configs\char_transformer.yaml: data.source: supabase,
-dataset_tag: all. Do step 35 first (the Supabase keys), then:
+7. What ored50m Is
 
 RUN
 
-python scripts\train.py --config configs\char_transformer.yaml --set run_name=ored_v207 --upload --set training.epochs=40 --set training.device=cuda
-
-Every run takes a fresh snapshot of the enabled + verified rows at that moment.
-Added rows since the last run = a new dataset version (all v2, v3, ...), so a new
-run_name per day (ored_v207, ored_v208, ...) is exactly right.
-
-OUTPUT (start) must show these lines, or the run is NOT on your data:
-
-TRAINING DATA SNAPSHOT
-dataset       : all v2 (ored_datasets ...)
-snapshot      : <64 letters>
-records       : 20,503  train ... / val ... / test ...
-session       : ... (ored_training_sessions, running)
-  corpus     : Supabase snapshot ... of 'all', 20,503 records (ored_training_data)
-
-If you see "corpus     : generated" the run is on the synthetic corpus. Stop it.
-
-The old synthetic corpus (grammar sentences + sums + facts.yaml) is now an
-explicit opt-out, never the default:
-
-python scripts\generate_facts.py --repeats 20
-python scripts\train.py --config configs\char_transformer.yaml --generated-corpus --set run_name=test_generated
-
-During training:
-
-base.pt
-   ↓
-live.pt
-   ↓
-validation
-   ↓
-better?
- ┌─┴──────────┐
-YES           NO
- ↓             ↓
-best.pt    best.pt stays
-
-Old replaced checkpoints are kept in:
-
-history/
-
-Every checkpoint (base / live / best / history) records which data made it:
-dataset tag, snapshot hash, row count, split counts, selection rule, tokenizer
-hash, git commit and the ored_training_sessions id. See step 42.
-More ways to choose the rows (one tag, one subject, ...): PART 7.
-
----
-
-11. Start Training From Another Checkpoint
-
-python scripts\train.py --config configs\char_transformer.yaml --set run_name=ored_v2 --init-from checkpoints\char_transformer_v2\best.pt --set training.epochs=40 --set training.device=cuda
-
-"--init-from" = start a new run using another checkpoint's weights.
-
----
-
-12. Continue Stopped Training
-
-python scripts\train.py --config configs\char_transformer.yaml --resume-live --set training.epochs=40
-
-"--resume-live" = continue training from "live.pt".
-
----
-
-========================================
-PART 4 — MANAGE CHECKPOINTS
-========================================
-
-13. Add Checkpoint as BEST
-
-RUN
-
-python scripts\checkpoints.py save FILE.pt --as best --config configs\char_transformer.yaml
-
-Example:
-
-python scripts\checkpoints.py save checkpoints\ored_v2\best.pt --as best --config configs\char_transformer.yaml
-
-"best.pt" only replaces the current best if the new checkpoint has a better validation result.
-
-To force replacement:
-
-python scripts\checkpoints.py save FILE.pt --as best --config configs\char_transformer.yaml --force
-
-The old "best.pt" is kept in "history/".
-
----
-
-14. Add Checkpoint as LIVE
-
-RUN
-
-python scripts\checkpoints.py save FILE.pt --as live --config configs\char_transformer.yaml
-
-Example:
-
-python scripts\checkpoints.py save checkpoints\ored_v2\live.pt --as live --config configs\char_transformer.yaml
-
-"live.pt" must contain everything needed to continue training.
-
-If it does not contain the required training state, use "--init-from" instead.
-
----
-
-15. Add Checkpoint to HISTORY
-
-RUN
-
-python scripts\checkpoints.py save FILE.pt --as history --config configs\char_transformer.yaml
-
-Example:
-
-python scripts\checkpoints.py save checkpoints\ored_v2\best.pt --as history --config configs\char_transformer.yaml
-
-This keeps the checkpoint as a backup in "history/".
-
----
-
-16. Add Checkpoint as BASE
-
-"base.pt" is created automatically when a new training run starts.
-
-You normally do not add "base.pt" manually.
-
-To start a new training run from an existing checkpoint:
-
-python scripts\train.py --config configs\char_transformer.yaml --set run_name=ored_v2 --init-from checkpoints\char_transformer_v2\best.pt --set training.epochs=40 --set training.device=cuda
-
-The existing checkpoint is used as the starting weights and the new run creates its own "base.pt".
-
----
-
-17. Merge LIVE Into BEST
-
-After an online-learning session creates "live.pt":
-
-CAREFUL: an online "live.pt" learned from whatever people typed into the chat.
-Ask it questions (step 19) before you merge it. Never merge it just because
-its loss is lower.
-
-RUN
-
-python scripts\checkpoints.py merge-live --config configs\char_transformer.yaml
-
-It compares "live.pt" and "best.pt" using the same validation data.
-
-If LIVE Is Better
-
-live.pt
-   ↓
-best.pt
-
-old best.pt
-   ↓
-history/
-
-If LIVE Is Not Better
-
-best.pt stays unchanged
-
-Example:
-
-live = 3.07018
-best = 3.37613
-
-Because lower validation loss is better:
-
-3.07018 < 3.37613
-
-So "live.pt" becomes "best.pt".
-
----
-
-18. Checkpoints From the Command Prompt
-
-List checkpoints
-
-python scripts\checkpoints.py list
-
-Save as BEST
-
-python scripts\checkpoints.py save FILE.pt --as best --config configs\char_transformer.yaml
-
-Save as LIVE
-
-python scripts\checkpoints.py save FILE.pt --as live --config configs\char_transformer.yaml
-
-Save as HISTORY
-
-python scripts\checkpoints.py save FILE.pt --as history --config configs\char_transformer.yaml
-
-Merge LIVE into BEST
-
-python scripts\checkpoints.py merge-live --config configs\char_transformer.yaml
-
----
-
-========================================
-PART 5 — AFTER TRAINING
-========================================
-
-19. After Done Training — Ask Questions
-
-RUN
-
-python scripts\recall.py --checkpoint checkpoints\ored_v2\best.pt
-
-python scripts\infer.py --checkpoint checkpoints\ored_v2\best.pt --text "Ask questions here. Delete this text and ask questions related to what he trained."
-
-For a model trained on Supabase data (PART 7) use "--ask" instead (step 41).
-
----
-
-20. After Asking Questions — Add Checkpoint
-
-IMPORTANT
-
-RUN
-
-set ORED_SB_URL=https://xoauguhlxjozpvukjtro.supabase.co
-set ORED_SB_SERVICE_KEY=YOUR_SECRET_KEY
-
-python scripts\checkpoints.py push checkpoints\ored_v2\best.pt --kind best --run-name ored_v2
-
----
-
-========================================
-PART 6 — TRAIN ON MANY PCS
-========================================
-
-21. Many PCs — What It Is
-
-Many PCs train ONE model together.
-
-PC 1 ─┐
-PC 2 ─┼─ train together → one model → one checkpoint
-PC 3 ─┘
-
-Each PC trains on a different part of the data.
-After every step all PCs share what they learned, so every PC has the same model.
-
-It is NOT:
-
-PC 1 trains alone
-PC 2 trains alone
-↓
-join the .pt files
-
-PC 1 is the main PC. It saves "best.pt" and the run summary.
-
-Full details: ored\model\docs\distributed-training.md
-
----
-
-22. Important — Many PCs
-
-Always add "--upload". Each PC only keeps its own part. To continue, every PC needs every part, and "--upload" is how they get it.
-
-Use "--rendezvous static" and set NODE_RANK, so PC 1 is always the main PC.
-
-Use a new "--session" name every time you start.
-
-The slowest PC sets the speed. A very slow GPU slows everyone. Leave it out.
-
-Each PC uses batch size 32. With 3 PCs, one step = 32 x 3 = 96 examples.
-
-Windows uses "gloo". Do not set backend to "nccl" on Windows.
-
----
-
-23. Before You Start — On EVERY PC
-
-Do steps 1 to 6 on every PC.
-
-Every PC must show the same version:
-
-RUN
-
-git log --oneline -1
+cd C:\Users\username\artz\ored\model
+python scripts\pretrain.py --describe
 
 OUTPUT
 
-Same on all PCs.
+"n_layer": 13,
+"d_model": 512,
+"n_head": 8,
+"d_ff": 2048,
+"block_size": 1024,
+"vocab_size": 16384,
+"parameters": 49894912,
 
-Every PC must train on exactly the same Supabase snapshot: take ONE snapshot
-on PC 1 and pass its hash to every PC (step 43). Without the hash the launch
-stops and tells you to take a snapshot first.
-
-If one PC has different data or a different config, training stops and says which PC is different.
-
----
-
-24. Connect the PCs
-
-All PCs must reach each other.
-
-Same home / same network → use PC 1's normal IP.
-
-Different homes → install Tailscale on every PC and log in with the same account. Use PC 1's Tailscale IP (starts with 100.).
-
-Find PC 1's IP (run on PC 1):
-
-RUN
-
-tailscale ip -4
-
-or:
-
-ipconfig
-
-Allow Python through Windows Firewall on every PC.
-
-Tick "Private" only. Do NOT tick "Public".
-
-Never open these ports on your router.
+It trains only on the big corpus stored in Cloudflare R2 (PART 4), never on the
+rows in Supabase. Supabase only keeps the record of which dataset exists.
 
 ---
 
-25. Check the PCs Can Talk
+8. The Checkpoint: best.pt Only
 
-Run on EVERY PC. Only NODE_RANK changes.
+checkpoints\
+└── ored50m\
+    ├── best.pt
+    └── history.json
 
-PC 1 = 0, PC 2 = 1, PC 3 = 2, and so on.
+best.pt       = the epoch with the lowest validation loss. The ONLY checkpoint.
+history.json  = loss of every epoch (numbers only, not a checkpoint)
 
-RUN
+After every epoch:
 
-set MASTER_ADDR=100.64.0.1
-set MASTER_PORT=29500
-set NNODES=3
-set NPROC_PER_NODE=1
-set NODE_RANK=0
+better validation loss → best.pt is replaced
+worse validation loss  → nothing is saved
 
-python scripts\distributed.py launch test --config configs\char_transformer.yaml --session net-check --rendezvous static
+There is no base.pt, no live.pt, no history\ folder, no epoch_001.pt.
 
-(Change 100.64.0.1 to PC 1's IP. Change NODE_RANK on each PC.)
+In R2 (step 22) it is, in the ored-checkpoints bucket:
 
-OUTPUT (on PC 1)
-
-  OK   all ranks discovered 3 of 3
-  OK   all ranks connected (all-gather)
-  OK   all-reduce sum 6, expected 6
-  OK   barrier
-VERIFIED: every worker can train together
-
-If it waits and never finishes → one PC can't reach PC 1. Check the IP and the firewall.
-
-If a PC has Wi-Fi and Ethernet and Tailscale, tell it which one to use:
-
-set GLOO_SOCKET_IFNAME=Tailscale
-
----
-
-26. Train on Many PCs
-
-Set your Supabase keys on EVERY PC (same as step 9):
-
-set ORED_SB_URL=https://xoauguhlxjozpvukjtro.supabase.co
-set ORED_SB_SERVICE_KEY=YOUR_SECRET_KEY
-
-Then run on EVERY PC. Only NODE_RANK changes.
-
-3 PCs
-
-RUN
-
-set MASTER_ADDR=100.64.0.1
-set MASTER_PORT=29500
-set NNODES=3
-set NPROC_PER_NODE=1
-set NODE_RANK=0
-
-python scripts\distributed.py launch train --config configs\char_transformer.yaml --session ored_v3-run1 --rendezvous static --set run_name=ored_v3 --set training.epochs=40 --set data.supabase.snapshot=PASTE_THE_64_LETTER_HASH -- --upload --report
-
-(The hash comes from "python scripts\training_data.py snapshot --dataset-tag all --upload", step 43.)
-
-5 PCs
-
-set NNODES=5
-
-NODE_RANK = 0, 1, 2, 3, 4
-
-10 PCs (or any number)
-
-set NNODES=10
-
-NODE_RANK = 0 to 9
-
-Nothing else changes.
-
-Meaning
-
-MASTER_ADDR    = PC 1's IP
-MASTER_PORT    = port on PC 1 (keep 29500)
-NNODES         = how many PCs
-NODE_RANK      = this PC's number (PC 1 = 0)
-NPROC_PER_NODE = GPUs used on this PC (normally 1)
---session      = name of this training run. Same on all PCs. New name for each new run.
---upload       = save checkpoints to Supabase (needed to continue later)
---report       = show the PCs in Supabase
-
-Start the PCs in any order. They wait for each other.
-
-During training (on PC 1):
-
-Epoch   1/40 | train loss ... | val loss ...  <- best so far
-
-"val loss" is from ALL PCs together, not just PC 1.
-"best" is picked from this number.
-
----
-
-27. See It on Your Phone (Supabase)
-
-Supabase → SQL Editor:
-
-select * from ored_training_run_overview;
-
-Shows: run, how many PCs, PCs alive, live epoch, best epoch, best loss.
-
-select rank, hostname, gpu_name, status, health from ored_training_worker_status order by rank;
-
-Shows each PC:
-
-rank 0  RTX 5060  training   alive
-rank 1  RTX 3060  training   alive
-rank 2  RTX 4050  checkpointing   alive
-
-"no heartbeat (unknown)" = PC not heard from for a while. It may be busy or off. Check it.
-
-select role, epoch, val_loss, world_size, is_complete, is_current from ored_checkpoint_groups where run_name = 'ored_v3';
-
-Shows live / best / history and if all PCs saved their part.
-
----
-
-28. Continue Stopped Training — Many PCs
-
-Start all PCs again with "--resume-live" and a NEW session name:
-
-python scripts\distributed.py launch train --config configs\char_transformer.yaml --session ored_v3-run2 --rendezvous static --set run_name=ored_v3 --set training.epochs=40 -- --resume-live --upload --report
-
-OUTPUT (on PC 1)
-
-resumed from      : ...live\checkpoint_epoch_0020_... (end of epoch 20, step ...), saved by 3 workers
-
-You can continue with a different number of PCs. Just change NNODES.
-
-3 PCs before → 2 PCs now = OK
-
-OUTPUT
-
-worker count changed (3 -> 2): model and optimizer restored ...
-
-If it says "can only resume with 3 workers" → use 3 PCs again.
-(This happens only if you used "--live-every-steps".)
-
----
-
-29. Add Another PC
-
-1. Do step 23 on the new PC.
-2. Stop training (Ctrl + C on all PCs).
-3. Start again (step 28) with NNODES one bigger.
-
-Example: 3 PCs → 4 PCs
-
-set NNODES=4
-
-New PC: set NODE_RANK=3
-
----
-
-30. If One PC Crashes
-
-PC crashes
-   ↓
-other PCs stop with an error
-   ↓
-last "live" is safe
-   ↓
-start all PCs again (step 28)
-
-Nothing is lost except the time since the last "live".
-
-A checkpoint is only used if EVERY PC saved its part. Half-saved checkpoints are never used.
-
----
-
-31. Check a Checkpoint
-
-Needs the Supabase keys (step 26). It downloads every PC's part and checks it.
-
-RUN
-
-python scripts\checkpoints.py verify live --run ored_v3 --config configs\char_transformer.yaml
-
-python scripts\checkpoints.py verify best --run ored_v3 --config configs\char_transformer.yaml
-
-OUTPUT
-
-VERIFIED
-
-or:
-
-FAILED
-  - rank 1: object ored_v3/live/checkpoint_.../__1_0.distcp is missing
-
-Checking a folder on one PC only works if that PC has every part:
-
-python scripts\distributed.py verify checkpoints\ored_v3\live\checkpoint_epoch_0040_... --config configs\char_transformer.yaml
-
----
-
-32. After Done Training — Ask Questions (Many PCs)
-
-On PC 1, "best.pt" is ready like before:
-
-python scripts\recall.py --checkpoint checkpoints\ored_v3\best.pt
-
-python scripts\infer.py --checkpoint checkpoints\ored_v3\best.pt --text "Ask questions here."
-
-With "--upload", best is already saved in Supabase. No step 20 needed.
-
----
-
-33. Checkpoint Structure — Many PCs
-
-checkpoints/
-│
-└── ored_v3/
-    ├── best.pt          ← for asking questions (PC 1)
-    ├── live.json        ← which live is current
-    ├── best.json        ← which best is current
-    ├── live/
-    │   └── checkpoint_epoch_0040_step_..._1a2b3c4d/
-    │       ├── manifest.json
-    │       ├── __0_0.distcp    ← PC 1's part
-    │       ├── __1_0.distcp    ← PC 2's part
-    │       ├── __2_0.distcp    ← PC 3's part
-    │       ├── rank-00000.pt
-    │       ├── rank-00001.pt
-    │       └── rank-00002.pt
-    ├── best/
-    ├── history/
-    └── base/
-
-One folder = one checkpoint, made of all PCs' parts.
-
-"manifest.json" lists every part. No manifest = not finished = never used.
+ored-ai/checkpoints/ored50m/best.pt
 
 ---
 
 ========================================
-PART 7 — TRAIN ON YOUR OWN DATA IN SUPABASE
+PART 3 — KEYS
 ========================================
 
-34. Supabase Data — What It Is
+9. Set Your R2 Keys
 
-Your questions, facts and words live in Supabase, table "ored_training_data".
-The 1003 questions from facts.yaml are already there (dataset tag "facts").
+Do this in EVERY new Command Prompt window, after step 3:
 
-You add rows in Supabase
-   ↓
-you mark them verified = true
-   ↓
-you run ONE command
-   ↓
-Ored takes a fixed copy of the rows (a "snapshot")
-   ↓
-splits it: train / val / test (the same question never lands in two)
-   ↓
-trains
-   ↓
-best.pt / live.pt / history/ like before
-   ↓
-Supabase records which data made which checkpoint
+RUN
 
-Only rows with enabled = true AND verified = true are used.
-Rows added while training runs are not used by that run.
+set ORED_R2_ACCOUNT_ID=YOUR_ACCOUNT_ID
+set ORED_R2_ACCESS_KEY_ID=YOUR_ACCESS_KEY_ID
+set ORED_R2_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
+set ORED_R2_BUCKET=ored-datasets
+set ORED_R2_CHECKPOINT_BUCKET=ored-checkpoints
 
-This is the DEFAULT since ored_v207: configs\char_transformer.yaml has
-data.source: supabase and dataset_tag: all, so step 10 already trains on every
-enabled + verified row. The commands below only narrow the selection.
+Get the keys from:
 
-Full details: ored\model\docs\training-data.md
+Cloudflare → R2 → Manage API tokens → Create API token (Object Read & Write)
+
+No quotes around the values.
+"set" only lasts for this window. That is on purpose.
+
+«Never put these keys in GitHub, in a file in artz, or in the website.»
 
 ---
 
-35. Set Your Supabase Keys
+10. Set Your Supabase Keys
 
 Do this in EVERY new Command Prompt window, after step 3:
 
@@ -848,255 +250,285 @@ Get YOUR_SECRET_KEY from:
 Supabase → Ored.ai project → Project Settings → API Keys → Secret key
 (it starts with sb_secret_)
 
-No quotes around the values.
-"set" only lasts for this window. That is on purpose.
-
 «Never put the secret key in GitHub, in a file in artz, or in the website.»
 
 ---
 
-36. See What Data Is There
+========================================
+PART 4 — GET THE DATA READY (your 9 Parquet files in R2)
+========================================
+
+Your raw files (9 Parquet files of about 285 MB, about 3 GB in total) stay in
+the ored-datasets bucket. Below:
+
+FOLDER   = the folder they are in, as step 11 shows it (e.g. training data/)
+VERSION  = v1 the first time; v2, v3, ... every time the set of files changes
+
+Use the quotes around FOLDER when it has a space.
+
+---
+
+11. See Your Files in R2
+
+Step 9 first.
 
 RUN
 
-python scripts\training_data.py stats
-
-OUTPUT (end)
-
-tag facts         : 1003 rows, 1003 trainable (enabled and verified), 0 awaiting review, 0 disabled
-
-Check every row is correct:
-
-RUN
-
-python scripts\training_data.py validate
+python scripts\corpus.py r2-list
 
 OUTPUT
 
-invalid   : 0
+    0.278 GiB  training data/part-00000.parquet
+    0.278 GiB  training data/part-00001.parquet
+    ...
+9 file(s), 2.5 GiB in r2://ored-datasets/
 
 ---
 
-37. Add Training Data
-
-Easiest: Supabase → Table Editor → ored_training_data → Insert → Insert row
-
-Fill in:
-
-type        qna
-category    science
-subject     physics
-topic       mechanics
-input       What is force?
-output      Force is a push or pull that can change the motion of an object.
-difficulty  beginner
-language    en
-dataset_tag facts           (or your own tag, or leave empty)
-verified    true            (only verified rows are trained on)
-enabled     true
-
-Leave id, fingerprint, created_at and updated_at EMPTY. Supabase fills them.
-
-Allowed "type": qna, fact, definition, vocabulary, sentence, conversation,
-instruction, comprehension, correction, translation, math, reasoning,
-writing, classification
-
-Allowed "category": language_foundation, grammar, sentences, general_knowledge,
-qna, conversation, mathematics, science, computer_science, engineering,
-reasoning, instructions, reading, writing, language_skills, data, everyday,
-safety, ored
-
-See every type, category and usual subject:
+12. Look Inside a File
 
 RUN
 
-python scripts\training_data.py taxonomy
+python scripts\corpus.py r2-inspect "training data/part-00000.parquet"
 
-Or add one row from the Command Prompt:
+(use one of the names step 11 printed)
 
-RUN
+OUTPUT
 
-python scripts\training_data.py add --type qna --category science --subject physics --input "What is force?" --output "A push or a pull." --tag facts --verified
+"file_format": "parquet",
+"parquet_rows": ...,
+"parquet_schema": [
+  "id: string",
+  "text: string",
+  ...
+],
 
-The same question with the same answer twice is refused:
+Only the end of the file (its schema) is downloaded, about 1 MB. Write down:
 
-DUPLICATE: 1 record(s) already exist with the same content ...
-
-Edit the old row instead of adding a copy.
-To stop using a row: set enabled = false. Do not delete it.
-
-If you change facts.yaml, bring the changes to Supabase:
-
-RUN
-
-python scripts\training_data.py import-facts --skip-duplicates
+TEXT_FIELD = the field with the document text (above: text)
+ID_FIELD   = the field with the document id (above: id)
 
 ---
 
-38. Train on Supabase Data
-
-Do steps 3 and 35 first.
-
-Only the facts:
+13. Download the Files
 
 RUN
 
-python scripts\train.py --config configs\char_transformer.yaml --supabase-dataset facts --upload --set training.device=cuda --epochs 40
+python scripts\corpus.py r2-fetch --prefix "training data/" --out data\raw\training-data
 
-Everything in Supabase (all tags):
+Parquet files are used as they are (no unpacking). Files already downloaded are
+skipped, so you can run it again after adding files.
 
-python scripts\train.py --config configs\char_transformer.yaml --supabase-dataset --upload --set training.device=cuda --epochs 40
+Needs free disk: about 3 GB for the files + about 2–3 GB for the shards (step 15).
 
-Only one subject:
+---
 
-python scripts\train.py --config configs\char_transformer.yaml --supabase-dataset facts --subject physics --upload --epochs 40
+14. Train the Tokenizer (once)
 
-Also rows that are not verified yet (only when you mean it):
+RUN
 
-python scripts\train.py --config configs\char_transformer.yaml --supabase-dataset facts --include-unverified --upload --epochs 40
+python scripts\corpus.py train-tokenizer --input data\raw\training-data --text-field TEXT_FIELD --vocab-size 16384 --max-bytes 300000000 --name ored-bpe-16k --version v1 --out data\tokenizers\ored-bpe-16k-v1.json
+
+It learns from a 300 MB sample spread over all files.
+
+OUTPUT (end)
+
+"vocab_size": 16384,
+"sha256": "<64 letters>"
+
+Keep this file. Every dataset version and every training run uses it.
+Adding or deleting files later does NOT need a new tokenizer.
+
+---
+
+15. Build the Training Shards
+
+RUN
+
+python scripts\corpus.py build-shards --input data\raw\training-data --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name training-data --version VERSION --out data\tokens\training-data\VERSION --workers 8
+
+--workers = how many CPU cores to use (number of cores minus 1 is fine).
+Each Parquet file is one unit of work, so 9 files keep up to 9 cores busy.
+
+Data split: 99% training, 1% validation, no test part. The validation part is
+what decides which epoch becomes best.pt, so keep it.
+
+OUTPUT (end)
+
+"content_sha256": "<64 letters>",
+"counts": { "documents": {...}, "tokens": {"train": ..., "val": ..., "test": ...} }
+
+If it stops, run the same command again: it continues where it stopped.
+
+---
+
+16. Upload the Shards to R2
+
+RUN
+
+python scripts\corpus.py publish --dir data\tokens\training-data\VERSION --name training-data --version VERSION
+
+---
+
+17. Register the Dataset in Supabase
+
+Step 10 first. Use the content_sha256 and token count from step 15:
+
+RUN
+
+python scripts\corpus.py register --name training-data --version-label VERSION --bucket ored-datasets --storage-path "training data" --dataset-type pretraining_corpus
+
+python scripts\corpus.py update-registry --name training-data --version-label VERSION --set sha256=CONTENT_SHA256 --set token_count=TRAIN_PLUS_VAL_PLUS_TEST_TOKENS --set status=ready
+
+After status=ready the record can no longer be changed (only deprecated).
+
+---
+
+18. When You Add or Delete Files
+
+1. Add or delete the files in the R2 folder.
+2. Make a fresh download folder for the new set (old files are not removed
+   from an existing folder):
+
+   python scripts\corpus.py r2-fetch --prefix "training data/" --out data\raw\training-data-VERSION --decompress
+
+3. Step 15 with the NEW version and --reuse-from the previous one:
+
+   python scripts\corpus.py build-shards --input data\raw\training-data-VERSION --text-field TEXT_FIELD --id-field ID_FIELD --tokenizer data\tokenizers\ored-bpe-16k-v1.json --name training-data --version VERSION --out data\tokens\training-data\VERSION --workers 8 --reuse-from data\tokens\training-data\PREVIOUS_VERSION
+
+   Files that did not change are not tokenized again; only new files are.
+
+4. Steps 16 and 17 with the new VERSION.
+5. Keep training the same model on the new version (set DATA with the new
+   VERSION first, see PART 5):
+
+   python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --init-from checkpoints\ored50m\best.pt --run-name ored50m-VERSION
+
+   It starts from the old model's weights; its own best.pt goes to
+   checkpoints\ored50m-VERSION\. (--resume only works on the same version.)
+
+---
+
+========================================
+PART 5 — TRAIN
+========================================
+
+Every train command below uses the same data settings. Write them once
+(VERSION = the dataset version you built in step 15):
+
+RUN
+
+set DATA=--set data.tokens.manifest=data\tokens\training-data\VERSION --set data.tokens.tokenizer=data\tokenizers\ored-bpe-16k-v1.json --set data.tokens.dataset_name=training-data --set data.tokens.dataset_version=VERSION
+
+---
+
+19. Measure What Fits on the GPU
+
+RUN
+
+python scripts\pretrain.py --config configs\ored50m.yaml --probe-batch-size
+
+OUTPUT
+
+{"batch_size": 1, "fits": true, "peak_gib": ..., "tokens_per_second": ...}
+{"batch_size": 2, "fits": true, ...}
+{"batch_size": 4, "fits": true, ...}
+{"batch_size": 6, "fits": false, ...}
+
+The default is batch 4 with 8 accumulation steps (= 32 sequences per step).
+If a bigger batch fits with room to spare, e.g. 8, use half the accumulation:
+
+--set data.batch_size=8 --set training.grad_accum_steps=4
+
+---
+
+20. Train
+
+RUN
+
+python scripts\pretrain.py --config configs\ored50m.yaml %DATA%
 
 OUTPUT (start)
 
-TRAINING DATA SNAPSHOT
-dataset       : facts v1 (ored_datasets ...)
-snapshot      : 8466d709a23e1131...
-selection     : enabled = true AND verified = true AND dataset_tag = 'facts' ...
-records       : 1,003  train 720 / val 147 / test 136  (seed 1337)
-session       : ... (ored_training_sessions, running)
+PRETRAINING RUN: ored50m (ored50m)
+GPU: NVIDIA GeForce RTX 5060 Laptop GPU ...
+parameters    : 49,894,912
+precision     : bf16
+batch         : micro-batch 4 x 1024 tokens, grad accumulation 8 -> effective 32 sequences = 32,768 tokens per optimizer step
+schedule      : ... steps/epoch, ... total
+dataset       : training-data VERSION (content ...)
 
-Checkpoints go to:
+Every 1000 steps it checks the validation loss on a fixed sample of 2000
+windows; if it is better, best.pt is replaced:
 
-checkpoints\char_transformer-facts\
-    base.pt
-    best.pt
-    live.pt
-    history\
+Epoch   1/2 step 1,000 | train loss ... | val loss ... | best ... | ... tok/s | peak ... GiB  <- new best.pt
 
-(--supabase-dataset without a tag → checkpoints\char_transformer-all\)
+It trains 40 epochs (40 passes over the data). For 20 epochs:
 
-Meaning
+--set training.epochs=20
 
---supabase-dataset facts = train on the rows with dataset_tag facts
---upload                 = save checkpoints to Supabase
---epochs 40              = how many times it goes through the data
---batch-size 64          = more per step, if your GPU has room
---run-name NAME          = choose the checkpoint folder name yourself
+It stops early after 5 checks in a row (5,000 steps) without a better
+validation loss, because by then the model is memorising, not learning; best.pt
+keeps the best point. To never stop early:
 
-A long command can go on several lines with ^ at the end of each line:
+--set training.early_stopping_patience=0
 
-python scripts\train.py --config configs\char_transformer.yaml ^
-  --supabase-dataset facts --upload --epochs 40
-
-At the end:
-
-session       : ... evaluated
-model version : char_transformer-facts-xxxxxxxx (candidate ...)
-
-"candidate" = saved, NOT made the live website model. You decide that yourself.
+How long: the start of the run prints "schedule : ... steps/epoch" and the
+log prints tok/s. Hours per epoch = steps/epoch x 32,768 / tok/s / 3600.
 
 ---
 
-39. Continue Stopped Training — Supabase Data
-
-Same command plus "--resume-live":
+21. Continue Stopped Training
 
 RUN
 
-python scripts\train.py --config configs\char_transformer.yaml --supabase-dataset facts --upload --resume-live --epochs 40
+python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --resume
 
-OUTPUT
-
-resuming live: training continues on the snapshot it started with, 8466d709a23e1131
-
-It keeps training on the SAME data it started with, even if you added rows since.
+It continues from the step saved in best.pt, inside the same epoch.
+Steps trained after the last best.pt are trained again.
 
 ---
 
-40. Train Again After Adding New Data
+22. Keep best.pt in R2 Too
 
-New or changed rows = a new snapshot (facts v2, v3, ...).
+Step 9 first. Add this to the train command:
 
-Start a NEW run with its own name, so it does not mix with the old one:
+--set checkpoint.r2_upload=true
 
 RUN
 
-python scripts\train.py --config configs\char_transformer.yaml --supabase-dataset facts --run-name ored_facts_v2 --upload --epochs 40
+python scripts\pretrain.py --config configs\ored50m.yaml %DATA% --set checkpoint.r2_upload=true
 
-Why a new name: new rows can bring new letters or symbols. A model trained
-without them cannot continue with them.
+Every new best.pt replaces ored-ai/checkpoints/ored50m/best.pt in the
+ored-checkpoints bucket. Only one copy is ever kept.
 
 ---
 
-41. Ask Questions — Supabase Data
+23. If It Runs Out of GPU Memory
 
-RUN
+The run stops with:
 
-python scripts\infer.py --checkpoint checkpoints\char_transformer-facts\best.pt --ask "What is velocity?"
+CUDA ran out of memory with micro-batch ...
 
-Several at once:
+best.pt is not touched. Then either:
 
-python scripts\infer.py --checkpoint checkpoints\char_transformer-facts\best.pt --ask "What is velocity?" --ask "What is the capital of France?"
+--set data.batch_size=2 --set training.grad_accum_steps=16
 
-OUTPUT
+or:
 
-Question: What is velocity?
-Answer: Velocity is speed together with a specified direction.
+--set model.gradient_checkpointing=true
 
-(The answer is only as good as the training. Few epochs = messy answers.)
-
-For a vocabulary row use its form:
-
-python scripts\infer.py --checkpoint checkpoints\char_transformer-facts\best.pt --ask "apple" --ask-type vocabulary
+and run step 20 again (or step 21 to continue).
 
 ---
 
-42. Which Data Made This Checkpoint?
+========================================
+PART 6 — NOT THERE YET
+========================================
 
-RUN
+24. What ored50m Cannot Do Yet
 
-python scripts\training_data.py lineage checkpoints\char_transformer-facts\best.pt
-
-OUTPUT
-
-dataset       : facts v1 (ored_datasets ...)
-snapshot      : 8466d709a23e1131...
-selection     : enabled = true AND verified = true AND dataset_tag = 'facts' ...
-records       : 1003 (train 720 / val 147 / test 136)
-git commit    : ...
-
-Also works with a checkpoint id from "python scripts\checkpoints.py list".
-
-On your phone (Supabase → SQL Editor):
-
-select run_name, role, epoch, val_loss, dataset_name, dataset_version, record_count from ored_checkpoint_lineage order by created_at desc;
-
-Old checkpoints (before PART 7) show empty dataset columns. That is normal.
-
----
-
-43. Supabase Data on Many PCs
-
-Every PC must train on exactly the same data. So first take ONE snapshot
-and save it to Supabase (on PC 1, after step 35):
-
-RUN
-
-python scripts\training_data.py snapshot --dataset-tag facts --upload
-
-OUTPUT (end)
-
-Train on exactly this snapshot:
-  python scripts\train.py ... --snapshot 8466d709a23e1131...(64 letters)
-
-Copy the 64-letter hash. Then do step 26 on EVERY PC, adding this --set (data.source is already supabase;
-add --set data.supabase.dataset_tag=facts too if you snapshotted one tag):
-
---set data.supabase.snapshot=PASTE_THE_64_LETTER_HASH
-
-Example:
-
-python scripts\distributed.py launch train --config configs\char_transformer.yaml --session ored_facts-run1 --rendezvous static --set run_name=ored_facts --set training.epochs=40 --set data.source=supabase --set data.supabase.dataset_tag=facts --set data.supabase.snapshot=PASTE_THE_64_LETTER_HASH -- --upload --report
-
-Every PC downloads the same snapshot and checks it.
-Without the hash it stops and tells you to take a snapshot first.
-
+- Train on many PCs.
+- Answer questions (scripts\infer.py / scripts\generate.py read the old
+  checkpoint format, not ored50m's best.pt).
+- Train on the rows in Supabase (ored_training_data).

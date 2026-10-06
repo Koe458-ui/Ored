@@ -505,7 +505,7 @@ def mismatch_worker(rank, world, cfg):
 
 
 def launch_args(*extra):
-    return build_parser().parse_args(["launch", "train", "--config", "configs/char_transformer.yaml", *extra])
+    return build_parser().parse_args(["launch", "train", "--config", "tests/configs/language_model.yaml", *extra])
 
 
 def test_launch_builds_a_c10d_torchrun_command(monkeypatch):
@@ -520,7 +520,7 @@ def test_launch_builds_a_c10d_torchrun_command(monkeypatch):
     assert "--nnodes=10" in command and "--nproc-per-node=1" in command
     assert "--rdzv-backend=c10d" in command and "--rdzv-endpoint=100.64.0.1:29600" in command
     assert "--rdzv-id=ored_v3-run1" in command
-    assert command[-6:] == ["ored.distributed", "train", "--config", "configs/char_transformer.yaml",
+    assert command[-6:] == ["ored.distributed", "train", "--config", "tests/configs/language_model.yaml",
                             "--session", "ored_v3-run1"]
 
 

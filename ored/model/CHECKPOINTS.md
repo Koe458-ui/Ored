@@ -1,5 +1,9 @@
 # Checkpoint Architecture
 
+> **Removed model.** This page describes the ~5.13M `char_transformer`, which was replaced by
+> ored50m. `configs/char_transformer.yaml` no longer exists, so the commands below that use it
+> do not run. To train, see `Guide to train` and [`docs/ored50m.md`](docs/ored50m.md).
+
 How Ored stores, finds, verifies and restores its checkpoints. Read this and you
 should be able to open Supabase on a phone, point at a row and say exactly what
 it is, where its file is, and whether training can continue from it.

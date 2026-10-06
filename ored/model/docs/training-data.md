@@ -1,5 +1,9 @@
 # Training Ored on data managed in Supabase
 
+> **Removed model.** This page describes the ~5.13M `char_transformer`, which was replaced by
+> ored50m. `configs/char_transformer.yaml` no longer exists, so the commands below that use it
+> do not run. To train, see `Guide to train` and [`docs/ored50m.md`](ored50m.md).
+
 Questions, facts, vocabulary, conversations and every other kind of teaching
 material live in one Supabase table, `ored_training_data`. A training run never
 reads that table batch by batch: it takes an **immutable snapshot** of the rows

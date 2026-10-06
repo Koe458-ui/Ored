@@ -127,6 +127,7 @@ PRETOKEN_RE = re.compile(
     r"|\s+"
 )
 DEFAULT_SUBWORD_VOCAB = 1024
+END_OF_TEXT = "<|endoftext|>"
 
 
 def pretokenize(text: str) -> List[str]:
@@ -156,13 +157,20 @@ def _to_symbols(word: str) -> str:
 
 @register_tokenizer("subword")
 class SubwordTokenizer(Tokenizer):
-    def __init__(self, merges: Sequence[Tuple[str, str]] = (), seen_bytes: Iterable[int] = range(256)) -> None:
+
+    def __init__(self, merges: Sequence[Tuple[str, str]] = (), seen_bytes: Iterable[int] = range(256),
+                 special_tokens: Sequence[str] = ()) -> None:
         self.seen_bytes: List[int] = sorted(set(int(b) for b in seen_bytes))
         self._seen = set(self.seen_bytes)
         self.merges: List[Tuple[str, str]] = [(a, b) for a, b in merges]
-        self.itos: List[str] = BASE_TOKENS + [a + b for a, b in self.merges]
+        self.special_tokens: List[str] = list(special_tokens)
+        if len(set(self.special_tokens)) != len(self.special_tokens):
+            raise ValueError("special tokens must be distinct")
+        n_regular = len(BASE_TOKENS) + len(self.merges)
+        self.itos: List[str] = BASE_TOKENS + [a + b for a, b in self.merges] + self.special_tokens
+        self.special_ids: Dict[str, int] = {t: n_regular + i for i, t in enumerate(self.special_tokens)}
         self.stoi: Dict[str, int] = {}
-        for i, token in enumerate(self.itos):
+        for i, token in enumerate(self.itos[:n_regular]):
             self.stoi.setdefault(token, i)
         self.ranks: Dict[Tuple[str, str], int] = {pair: i for i, pair in enumerate(self.merges)}
         self._cache: Dict[str, List[int]] = {}
@@ -176,9 +184,24 @@ class SubwordTokenizer(Tokenizer):
         seen = set(text.encode("utf-8")) | {ord("\n")}
         return cls(learn_merges(words, vocab_size - len(BASE_TOKENS)), seen)
 
+    @classmethod
+    def from_word_counts(cls, words: Counter, seen_bytes: Iterable[int], vocab_size: int,
+                         special_tokens: Sequence[str] = ()) -> "SubwordTokenizer":
+        n_merges = vocab_size - len(BASE_TOKENS) - len(special_tokens)
+        if n_merges < 0:
+            raise ValueError(f"vocab_size {vocab_size} leaves no room for 256 bytes + "
+                             f"{len(special_tokens)} special token(s)")
+        return cls(learn_merges(words, n_merges), seen_bytes, special_tokens)
+
     @property
     def vocab_size(self) -> int:
         return len(self.itos)
+
+    def special_id(self, token: str = END_OF_TEXT) -> int:
+        if token not in self.special_ids:
+            raise KeyError(f"this tokenizer has no special token {token!r} "
+                           f"(it has {self.special_tokens or 'none'})")
+        return self.special_ids[token]
 
     @property
     def alphabet(self) -> List[str]:
@@ -186,6 +209,8 @@ class SubwordTokenizer(Tokenizer):
 
     def is_known(self, token_id: int) -> bool:
         token_id = int(token_id)
+        if token_id in self.special_ids.values():
+            return False
         return token_id >= len(BASE_TOKENS) or token_id in self._seen
 
     def _encode_word(self, word: str) -> List[int]:
@@ -223,16 +248,21 @@ class SubwordTokenizer(Tokenizer):
         return bytes(CHAR_TO_BYTE[c] for c in self.itos[index])
 
     def decode(self, ids: Sequence[int]) -> str:
-        data = b"".join(self.token_bytes(int(i)) for i in ids)
+        specials = set(self.special_ids.values())
+        data = b"".join(self.token_bytes(int(i)) for i in ids if int(i) not in specials)
         return data.decode("utf-8", errors="replace")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"name": "subword", "kind": "byte_bpe", "itos": self.itos,
+        data = {"name": "subword", "kind": "byte_bpe", "itos": self.itos,
                 "merges": [list(m) for m in self.merges], "seen_bytes": self.seen_bytes}
+        if self.special_tokens:
+            data["special_tokens"] = list(self.special_tokens)
+        return data
 
     @classmethod
     def _from_dict(cls, data: Dict[str, Any]) -> "SubwordTokenizer":
-        tokenizer = cls([tuple(m) for m in data["merges"]], data.get("seen_bytes", range(256)))
+        tokenizer = cls([tuple(m) for m in data["merges"]], data.get("seen_bytes", range(256)),
+                        data.get("special_tokens", ()))
         if tokenizer.itos != list(data["itos"]):
             raise ValueError("subword tokenizer's itos does not match its merges")
         return tokenizer
@@ -242,6 +272,16 @@ class SubwordTokenizer(Tokenizer):
                          key=len, reverse=True)[:5]
         return (f"SubwordTokenizer (byte-level BPE) | vocab_size={self.vocab_size} | 256 bytes "
                 f"+ {len(self.merges)} merges | longest pieces: {longest!r}")
+
+
+def count_words(texts: Iterable[str]) -> Tuple[Counter, set]:
+    words: Counter = Counter()
+    seen = {ord("\n")}
+    for text in texts:
+        for word in pretokenize(text):
+            words[_to_symbols(word)] += 1
+        seen.update(text.encode("utf-8"))
+    return words, seen
 
 
 def learn_merges(words: Counter, n_merges: int) -> List[Tuple[str, str]]:

@@ -15,7 +15,7 @@ from ored.data.generate import generate_dataset
 
 CONFIGS = Path(__file__).resolve().parent.parent / "configs"
 CONFIG_PATH = CONFIGS / "bit_adder_mlp.yaml"
-LM_CONFIG_PATH = CONFIGS / "char_transformer.yaml"
+LM_CONFIG_PATH = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
 
 
 @pytest.fixture()

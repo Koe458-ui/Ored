@@ -178,7 +178,7 @@ def test_hostile_run_names_and_snapshot_refs(tmp_path, monkeypatch):
     seen = {}
     monkeypatch.setattr("ored.training.trainer.train", lambda c: seen.setdefault("cfg", c))
     train_main(["--config", str(CONFIG), "--supabase-dataset", "../../outside"])
-    assert seen["cfg"].run_name == "char_transformer-..-..-outside"
+    assert seen["cfg"].run_name == "language_model_test-..-..-outside"
     with pytest.raises(ValueError):
         train_main(["--config", str(CONFIG), "--supabase-dataset", "x", "--snapshot", "../../../etc"])
 

@@ -33,7 +33,7 @@ def _generate_with_hash_seed(hash_seed: str) -> str:
     env = dict(os.environ, PYTHONHASHSEED=hash_seed)
     result = subprocess.run(
         [sys.executable, "-c", SCRIPT, str(ROOT / "src"),
-         str(ROOT / "configs" / "char_transformer.yaml")],
+         str(ROOT / "tests" / "configs" / "language_model.yaml")],
         capture_output=True, text=True, env=env, check=True,
     )
     return result.stdout.strip().splitlines()[-1]

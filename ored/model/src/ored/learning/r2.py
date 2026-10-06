@@ -4,6 +4,7 @@ import datetime as dt
 import hashlib
 import hmac
 import os
+import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +23,7 @@ from ored.learning.store import StoreError
 
 # One PUT to R2 takes at most 5 GiB; bigger files would need a multipart upload.
 MAX_PUT_BYTES = 5 * 1024 * 1024 * 1024
+DOWNLOAD_CHUNK = 4 * 1024 * 1024
 REGION = "auto"
 SERVICE = "s3"
 S3_NS = "{http://s3.amazonaws.com/doc/2006-03-01/}"
@@ -154,14 +156,39 @@ class R2Store(CheckpointStore):
 
     def download(self, object_path: str, path: str | Path) -> Path:
         path = Path(path)
-        status, _, body = self._request("GET", self._key_url(object_path))
-        if status == 404:
-            raise StoreError(f"GET r2://{self.bucket}/{object_path} -> 404 not found")
+        key = self._key_url(object_path)
+        signed = self._signed_headers("GET", key, [], hashlib.sha256(b"").hexdigest(), {})
+        request = urllib.request.Request(self.endpoint + key, method="GET", headers=signed)
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".part")
-        tmp.write_bytes(body)
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response, open(tmp, "wb") as out:
+                shutil.copyfileobj(response, out, DOWNLOAD_CHUNK)
+        except urllib.error.HTTPError as exc:
+            tmp.unlink(missing_ok=True)
+            if exc.code == 404:
+                raise StoreError(f"GET r2://{self.bucket}/{object_path} -> 404 not found") from exc
+            detail = exc.read().decode("utf-8", "replace")[:300]
+            raise StoreError(f"GET r2://{self.bucket}/{object_path} -> {exc.code} {detail}") from exc
+        except urllib.error.URLError as exc:
+            tmp.unlink(missing_ok=True)
+            raise StoreError(f"GET {self.endpoint} could not be reached: {exc.reason}") from exc
         tmp.replace(path)
         return path
+
+    def read_range(self, object_path: str, start: int, length: int) -> bytes:
+        if length <= 0:
+            return b""
+        status, _, body = self._request("GET", self._key_url(object_path),
+                                        headers={"range": f"bytes={start}-{start + length - 1}"})
+        if status == 404:
+            raise StoreError(f"GET r2://{self.bucket}/{object_path} -> 404 not found")
+        if status != 206:
+            body = body[start:]
+        return body[:length]
+
+    def read_head(self, object_path: str, length: int) -> bytes:
+        return self.read_range(object_path, 0, max(1, length))
 
     def remove(self, object_path: str) -> None:
         if self.stat(object_path) is None:
