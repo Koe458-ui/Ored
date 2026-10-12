@@ -1,0 +1,6 @@
+.git
+.github
+.assetsignore
+wrangler.jsonc
+*.md
+LICENSE
