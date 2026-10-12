@@ -15,7 +15,7 @@
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/Koe458-ui/Ored?style=flat)](https://github.com/Koe458-ui/Ored)
 
 <h1 align="center">Ored - the art community</h1>
-<p align="center">oredlab is a curated platform for digital artists to showcase exceptional artwork, build a professional portfolio, connect with a global creative community, and gain the recognition their talent deserves</p>
+<p align="center">oredlab is a ai  </p>
 
 <h1 align="center">Live site</h1>
 <p align="center">https://oredlab.com</p>
@@ -23,11 +23,10 @@
 <h1 align="center">Features</h1>
 <p align="center">
  
-  - Dynamic gallery and profile view.
-  - Artist follow, like , messages ,etc
-  
-  - Communities, friends, merit system and many more.
-  - No AI art , only human art
+  - local download ai
+  - can train locally and use locally
+  - full cuztomization in your hand
+  - easy 
 </p>
 
 <h1 align="center">Licence</h1>
