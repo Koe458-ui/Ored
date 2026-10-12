@@ -1,0 +1,22 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #ffffff; font-family: system-ui, sans-serif; color: #111; }
+
+/* 3D canvas stays fixed behind the text */
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+main { position: relative; z-index: 1; }
+
+
+section { height: 100vh; display: flex; align-items: center; padding: 0 6vw; }
+section.tall { height: 200vh; align-items: flex-start; padding: 0; }
+.sticky { position: sticky; top: 0; height: 100vh; width: 100%; display: flex; align-items: flex-end; justify-content: center; padding: 0 6vw 8vh; }
+
+.copy { max-width: 28ch; }
+.copy.left { margin-right: auto; }
+.copy.right { margin-left: auto; text-align: right; }
+#room .copy, #music .copy { color: #fff; mix-blend-mode: difference; }
+
+button { padding: 0.7em 1.4em; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; cursor: pointer; }
+
+#loader { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: #fff; transition: opacity 0.5s; }
+#loader.done { opacity: 0; pointer-events: none; }
