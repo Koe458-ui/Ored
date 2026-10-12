@@ -1,0 +1,43 @@
+!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Robo</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="loader">Loading…</div>
+  <canvas id="scene"></canvas>
+
+  <main>
+    <section id="room">
+      <div class="copy left"><h1>Room</h1><p>Your text here.</p></div>
+    </section>
+    <section id="music">
+      <div class="copy left"><h2>Music</h2><p>Your text here.</p><button>Button</button></div>
+    </section>
+    <section id="drop">
+      <div class="copy left"><h2>Drop</h2><p>Your text here.</p></div>
+    </section>
+    <section id="slide">
+      <div class="copy right"><h2>Slide</h2><p>Your text here.</p></div>
+    </section>
+    <section id="end" class="tall">
+      <div class="sticky">
+        <footer><h2>Footer</h2><p>Your footer here.</p></footer>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
