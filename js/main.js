@@ -50,7 +50,8 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// scroll ->t targetFrame = 0, frame = 0;
+// scroll -> frame
+let targetFrame = 0, frame = 0;
 function readScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
   targetFrame = max > 0 ? (window.scrollY / max) * LAST_FRAME : 0;
