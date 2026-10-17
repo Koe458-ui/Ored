@@ -13,7 +13,7 @@ from ored.data.tokenizer import Tokenizer
 from ored.evaluation.text_metrics import score_arithmetic, score_text
 from ored.inference.generator import complete, generate_text
 from ored.models.registry import build_model
-from ored.utils.checkpoint import check_compatible, load_checkpoint, load_model_state
+from ored.utils.checkpoint import check_compatible, load_for_inference, load_model_state
 from ored.utils.logging_utils import get_logger, section
 from ored.utils.seed import resolve_device, set_seed
 
@@ -25,7 +25,7 @@ def load_language_model(
     device: str = "auto",
 ) -> Tuple[torch.nn.Module, Tokenizer, Config, Dict[str, Any]]:
     resolved = resolve_device(device)
-    payload = load_checkpoint(checkpoint_path, map_location=resolved)
+    payload = load_for_inference(checkpoint_path, map_location=resolved)
     cfg = config_from_dict(payload["config"])
 
     if not payload.get("tokenizer"):
@@ -48,8 +48,63 @@ def load_language_model(
         "kind": payload.get("checkpoint_kind"),
         "global_step": payload.get("global_step"),
         "device": resolved,
+        "tokenizer_info": (payload.get("extra") or {}).get("tokenizer_info"),
     }
     return model, tokenizer, cfg, info
+
+
+@torch.no_grad()
+def measure_token_shards(model, cfg: Config, device: torch.device,
+                         tokenizer_info: Dict[str, Any]) -> Dict[str, float]:
+    from ored.data.token_shards import TokenWindowDataset, load_manifest, verify_shards
+    from ored.training.pretrain import _dataset_directory, validation_sample
+
+    directory = _dataset_directory(cfg, tokenizer_info)
+    manifest = load_manifest(directory)
+    if manifest["tokenizer"]["sha256"] != tokenizer_info["sha256"]:
+        raise ValueError(f"{directory} was tokenized with a different tokenizer than this checkpoint")
+    verify_shards(directory, manifest, cfg.data.tokens.verify, splits=("val",))
+    block = cfg.data.block_size
+    windows = validation_sample(TokenWindowDataset(directory, manifest, "val", block, block),
+                                cfg.training.eval_windows, cfg.seed)
+    total_loss = 0.0
+    total_tokens = 0
+    for start in range(0, len(windows), 32):
+        chunk = [windows[i] for i in range(start, min(start + 32, len(windows)))]
+        ids = torch.stack([c[0] for c in chunk]).to(device)
+        targets = torch.stack([c[1] for c in chunk]).to(device)
+        logits = model(ids)
+        total_loss += torch.nn.functional.cross_entropy(
+            logits.reshape(-1, logits.size(-1)).float(), targets.reshape(-1), reduction="sum").item()
+        total_tokens += targets.numel()
+    mean_loss = total_loss / max(total_tokens, 1)
+    return {"windows": float(len(windows)), "tokens": float(total_tokens), "loss": mean_loss,
+            "perplexity": math.exp(min(mean_loss, 20.0))}
+
+
+def evaluate_token_model(model, tokenizer: Tokenizer, cfg: Config, info: Dict[str, Any],
+                         n_samples: int, sample_tokens: int, temperature: float) -> Dict[str, Any]:
+    resolved = info["device"]
+    try:
+        val = measure_token_shards(model, cfg, resolved, info["tokenizer_info"])
+    except Exception as exc:
+        val = None
+        logger.info(f"validation skipped: the token shards could not be read ({exc})")
+    if val is not None:
+        logger.info(f"val windows : {int(val['windows']):,} ({int(val['tokens']):,} tokens)")
+        logger.info(f"val loss    : {val['loss']:.4f}")
+        logger.info(f"perplexity  : {val['perplexity']:.3f}")
+
+    logger.info(section("GENERATED TEXT"))
+    samples: List[str] = []
+    for _ in range(n_samples):
+        text = generate_text(model=model, tokenizer=tokenizer, prompt="", max_new_tokens=sample_tokens,
+                             block_size=cfg.data.block_size, device=resolved, temperature=temperature)
+        samples.append(text)
+        for line in text.strip().split("\n")[:14]:
+            logger.info(f"  {line}")
+        logger.info("")
+    return {"checkpoint": info, "val": val, "samples": samples}
 
 
 @torch.no_grad()
@@ -124,6 +179,9 @@ def evaluate_language_model(
     logger.info(f"trained to : epoch {info.get('epoch')}")
     logger.info(f"model      : {model.describe()}")
     logger.info("")
+
+    if cfg.data.source == "tokens":
+        return evaluate_token_model(model, tokenizer, cfg, info, n_samples, sample_tokens, temperature)
 
     split_results = measure_splits(model, cfg, resolved, splits)
     header = f"{'split':<8}{'tokens':>12}{'loss':>10}{'bits/char':>12}{'perplexity':>13}"

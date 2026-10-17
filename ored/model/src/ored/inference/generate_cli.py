@@ -11,7 +11,7 @@ from ored.utils.seed import set_seed
 
 logger = get_logger(__name__)
 
-DEFAULT_CHECKPOINT = "checkpoints/char_transformer/best.pt"
+DEFAULT_CHECKPOINT = "checkpoints/ored50m/best.pt"
 
 
 def main(argv: Optional[List[str]] = None) -> int:

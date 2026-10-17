@@ -8,7 +8,7 @@ from typing import List, Optional, Sequence
 
 from ored.data.tokenizer import Tokenizer
 from ored.inference.predictor import read_tokenizer, resolve_checkpoint
-from ored.utils.checkpoint import load_checkpoint
+from ored.utils.checkpoint import load_for_inference
 from ored.utils.logging_utils import get_logger, section
 
 logger = get_logger(__name__)
@@ -88,7 +88,7 @@ def inspect(
 
 
 def tokenizer_from_checkpoint(path: str | Path) -> Tokenizer:
-    return read_tokenizer(load_checkpoint(path, map_location="cpu"), path)
+    return read_tokenizer(load_for_inference(path, map_location="cpu"), path)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -408,6 +408,7 @@ class PretrainTrainer:
             "history": [dict(r) for r in self.history] + [dict(record)],
             "initialised_from": getattr(self, "initialised_from", None),
             "tokenizer": dict(self.data.tokenizer_info),
+            "tokenizer_data": self.data.tokenizer.to_dict(),
             "dataset": dict(self.data.identity),
             "config": self.cfg.to_dict(),
             "code": _code_version(),

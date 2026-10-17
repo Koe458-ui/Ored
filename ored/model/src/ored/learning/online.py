@@ -20,7 +20,7 @@ from ored.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_CHECKPOINT = "checkpoints/char_transformer/best.pt"
+DEFAULT_CHECKPOINT = "checkpoints/ored50m/best.pt"
 DEFAULT_LIVE_DIR = "checkpoints/live"
 
 

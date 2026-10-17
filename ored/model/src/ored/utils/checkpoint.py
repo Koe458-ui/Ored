@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -263,18 +264,63 @@ def normalise(payload: Any, path: str | Path = "<checkpoint>") -> Dict[str, Any]
     return payload
 
 
-def load_checkpoint(path: str | Path, map_location: str | torch.device = "cpu") -> Dict[str, Any]:
-    path = Path(path)
+def _read(path: Path, map_location: str | torch.device) -> Any:
     if not path.exists():
         raise FileNotFoundError(
             f"checkpoint not found: {path}\n"
             f"Train a model first:  python scripts/train.py"
         )
     try:
-        raw = torch.load(path, map_location=map_location, weights_only=True)
+        return torch.load(path, map_location=map_location, weights_only=True)
     except Exception as exc:
         raise CheckpointError(f"{path} is not a readable checkpoint ({exc.__class__.__name__}: {exc})") from exc
-    return normalise(raw, path)
+
+
+def load_checkpoint(path: str | Path, map_location: str | torch.device = "cpu") -> Dict[str, Any]:
+    path = Path(path)
+    return normalise(_read(path, map_location), path)
+
+
+def _best_only_tokenizer(raw: Dict[str, Any], path: Path) -> Dict[str, Any]:
+    from ored.data.tokenizer_artifact import load_artifact
+
+    if raw.get("tokenizer_data"):
+        return raw["tokenizer_data"]
+    info = raw.get("tokenizer") or {}
+    recorded = ((raw.get("config") or {}).get("data") or {}).get("tokens", {}).get("tokenizer", "")
+    for candidate in (os.environ.get("ORED_TOKENIZER", ""), recorded):
+        if candidate and Path(candidate).is_file():
+            return load_artifact(candidate, info.get("sha256", ""))[0].to_dict()
+    raise CheckpointError(
+        f"{path} was trained with tokenizer {info.get('name')} {info.get('version')} "
+        f"(sha256 {str(info.get('sha256'))[:16]}), which is not inside the checkpoint and is not at "
+        f"{recorded or 'the path its config records'}. Set ORED_TOKENIZER to that tokenizer artifact.")
+
+
+def load_for_inference(path: str | Path, map_location: str | torch.device = "cpu") -> Dict[str, Any]:
+    from ored.training.best_checkpoint import CHECKPOINT_SCHEMA
+
+    path = Path(path)
+    raw = _read(path, map_location)
+    if not (isinstance(raw, dict) and raw.get("schema") == CHECKPOINT_SCHEMA):
+        return normalise(raw, path)
+    architecture = dict(raw.get("architecture") or {})
+    architecture.pop("parameters", None)
+    return {
+        "format_version": CHECKPOINT_FORMAT_VERSION,
+        "checkpoint_kind": "best",
+        "run_name": raw.get("run_name"),
+        "architecture": architecture,
+        "model_state_dict": raw["model_state_dict"],
+        "config": raw["config"],
+        "tokenizer": _best_only_tokenizer(raw, path),
+        "epoch": raw.get("epoch"),
+        "global_step": raw.get("global_step"),
+        "metrics": dict(raw.get("metrics") or {}),
+        "torch_version": raw.get("torch_version"),
+        "created_at": raw.get("created_at"),
+        "extra": {"dataset": raw.get("dataset"), "tokenizer_info": raw.get("tokenizer")},
+    }
 
 
 def _fmt(description: Mapping[str, Any]) -> str:

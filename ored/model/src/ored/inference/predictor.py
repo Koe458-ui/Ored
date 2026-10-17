@@ -11,13 +11,13 @@ from ored.config import Config, config_from_dict
 from ored.data.tokenizer import Tokenizer
 from ored.inference.generator import complete, generate_text
 from ored.models.registry import build_model
-from ored.utils.checkpoint import check_compatible, load_checkpoint, load_model_state
+from ored.utils.checkpoint import check_compatible, load_for_inference, load_model_state
 from ored.utils.logging_utils import get_logger, section
 from ored.utils.seed import resolve_device
 
 logger = get_logger(__name__)
 
-DEFAULT_CHECKPOINT = "checkpoints/char_transformer/best.pt"
+DEFAULT_CHECKPOINT = "checkpoints/ored50m/best.pt"
 
 PREDICTOR_REGISTRY: Dict[str, Type["BasePredictor"]] = {}
 
@@ -118,7 +118,7 @@ class BasePredictor:
         device: str = "auto",
     ) -> "BasePredictor":
         resolved_device = resolve_device(device)
-        payload = load_checkpoint(path, map_location=resolved_device)
+        payload = load_for_inference(path, map_location=resolved_device)
         cfg = config_from_dict(payload["config"])
 
         key = resolve_task(payload, cfg, path)

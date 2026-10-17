@@ -118,10 +118,10 @@ def test_language_model_cli_completes_text(trained_lm_checkpoint):
     assert "5 + 6 = " in stream.getvalue()
 
 
-def test_the_default_checkpoint_is_the_transformer():
+def test_the_default_checkpoint_is_ored50m():
     from ored.inference.predictor import DEFAULT_CHECKPOINT, resolve_checkpoint
 
-    assert resolve_checkpoint() == DEFAULT_CHECKPOINT == "checkpoints/char_transformer/best.pt"
+    assert resolve_checkpoint() == DEFAULT_CHECKPOINT == "checkpoints/ored50m/best.pt"
     assert resolve_checkpoint("somewhere/else.pt") == "somewhere/else.pt"
 
 

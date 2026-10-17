@@ -719,3 +719,79 @@ def test_ored50m_trains_forty_epochs_without_a_test_split(capsys):
     with pytest.raises(SystemExit):
         corpus_cli.main(["build-shards", "--help"])
     assert "--test-fraction" in capsys.readouterr().out
+
+
+@pytest.fixture()
+def trained_50m(shards, tmp_path, artifact):
+    out, *_ = shards
+    cfg = tiny_cfg(tmp_path, out, artifact, **{"training.epochs": 1})
+    PretrainTrainer(cfg).fit()
+    return cfg, cfg.checkpoint_dir / "best.pt"
+
+
+def test_best_carries_its_tokenizer_and_answers_through_infer(trained_50m, tokenizer, caplog):
+    from ored.inference.predictor import LanguageModelPredictor, load_predictor
+    from ored.inference.predictor import main as infer_main
+
+    _, best = trained_50m
+    assert torch.load(best, weights_only=True)["tokenizer_data"] == tokenizer.to_dict()
+    predictor = load_predictor(best, device="cpu")
+    assert isinstance(predictor, LanguageModelPredictor)
+    assert predictor.tokenizer.to_dict() == tokenizer.to_dict()
+    assert isinstance(predictor.predict("the quick ", max_new_tokens=4).completion, str)
+    caplog.set_level("INFO")
+    assert infer_main(["--checkpoint", str(best), "--device", "cpu", "--text", "the quick ", "--quiet"]) == 0
+    assert "the quick " in caplog.text
+
+
+def strip_tokenizer(best, tmp_path):
+    payload = torch.load(best, weights_only=True)
+    del payload["tokenizer_data"]
+    older = tmp_path / "older" / "best.pt"
+    older.parent.mkdir()
+    torch.save(payload, older)
+    return older
+
+
+def test_an_older_best_finds_its_tokenizer_artifact(trained_50m, tmp_path, artifact, monkeypatch):
+    from ored.inference.predictor import load_predictor
+    from ored.utils.checkpoint import CheckpointError
+
+    older = strip_tokenizer(trained_50m[1], tmp_path)
+    assert load_predictor(older, device="cpu").tokenizer.vocab_size == 320
+
+    moved = tmp_path / "elsewhere.json"
+    artifact.rename(moved)
+    with pytest.raises(CheckpointError, match="ORED_TOKENIZER"):
+        load_predictor(older, device="cpu")
+    monkeypatch.setenv("ORED_TOKENIZER", str(moved))
+    assert load_predictor(older, device="cpu").tokenizer.vocab_size == 320
+
+
+def test_evaluate_and_generate_read_a_best(trained_50m, caplog):
+    from ored.evaluation.evaluator import main as evaluate_main
+    from ored.evaluation.lm_evaluator import evaluate_language_model, load_language_model
+
+    _, best = trained_50m
+    model, tokenizer, cfg, _ = load_language_model(best, "cpu")
+    assert cfg.run_name == "ored50m" and model.describe()["vocab_size"] == tokenizer.vocab_size
+    result = evaluate_language_model(best, device="cpu", n_samples=1, sample_tokens=8)
+    assert result["val"]["tokens"] > 0 and result["val"]["loss"] > 0 and len(result["samples"]) == 1
+    caplog.set_level("INFO")
+    assert evaluate_main(["--checkpoint", str(best), "--device", "cpu", "--samples", "1"]) == 0
+    assert "val loss" in caplog.text
+
+
+def test_generate_and_the_online_learner_read_a_best(trained_50m, tmp_path, caplog):
+    from ored.inference.generate_cli import main as generate_main
+    from ored.learning.online import OnlineLearner, OnlinePolicy
+
+    _, best = trained_50m
+    caplog.set_level("INFO")
+    assert generate_main(["--checkpoint", str(best), "--device", "cpu", "--prompt", "the ", "--tokens", "8"]) == 0
+    learner = OnlineLearner.from_checkpoint(best, device="cpu", policy=OnlinePolicy(), live_dir=tmp_path / "live")
+    reply, _ = learner.respond("the quick brown fox jumps over a lazy dog")
+    assert isinstance(reply, str)
+    saved = learner.save()
+    assert OnlineLearner.from_checkpoint(saved, device="cpu", policy=OnlinePolicy(),
+                                         live_dir=tmp_path / "again").tokenizer.vocab_size == 320
