@@ -1,7 +1,7 @@
 {
   "name": "Ored",
   "short_name": "Ored",
-  "description": "DigiArtz's own AI model, built for simple tasks and problem solving.",
+  "description": "An AI model built for simple tasks and problem solving.",
   "start_url": "/",
   "scope": "/",
   "icons": [

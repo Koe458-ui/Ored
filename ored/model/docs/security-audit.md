@@ -4,7 +4,7 @@
 |---|---|
 | Date | 2026-09-26 |
 | Branch | `albaze777/supabase-training-pipeline-efqpgi` |
-| Scope | the whole Ored system: browser → `ored.digiartz.net` → Cloudflare Worker → `/api/ored` → model server (`serve.py`) → Supabase (tables, RPCs, Storage) → training data → sessions → distributed workers → checkpoints → model versions → inference, and the DigiArtz → Ored sign-in hand-off |
+| Scope | the whole Ored system: browser → `oredlab.com` → Cloudflare Worker → `/api/ored` → model server (`serve.py`) → Supabase (tables, RPCs, Storage) → training data → sessions → distributed workers → checkpoints → model versions → inference, and the Ored AI → Ored sign-in hand-off |
 | Method | defensive and non-destructive: code review, Git-history scan, catalog queries and role-switched probes on the live database inside transactions that were rolled back, a local harness running the real Worker code, a local model server, and local Postgres + PostgREST for the Python REST client |
 | Not done | no secret was read, printed, rotated or changed; no production data, configuration or running training was touched; no load or brute-force test |
 
@@ -114,8 +114,8 @@ No secret value appears in this document.
 |---|---|---|
 | I1 | Publishable keys and project URLs are committed on purpose; they are public by design | `wrangler.jsonc`, `public/_headers`, `/config.js` |
 | I2 | `GET /health` needs no key and reveals the online-learning counters (seen / learned / steps / loss) | `serve.py` `do_GET` |
-| I3 | The DigiArtz `/authorize` endpoint (redirect allow-list, which session's tokens it hands over) lives in another project and could not be checked from this repository. Ored itself always sends its own origin as `redirect_uri` | `public/app.js` `handoff()` |
-| I4 | Sign-out calls `supabase.auth.signOut()` with the library's default global scope, which also revokes the member's other sessions, including DigiArtz. That is safe, but contradicts "You are still signed in on DigiArtz". Use `{ scope: 'local' }` if the message is the intent | `public/app.js` sign-out handler |
+| I3 | The Ored AI `/authorize` endpoint (redirect allow-list, which session's tokens it hands over) lives in another project and could not be checked from this repository. Ored itself always sends its own origin as `redirect_uri` | `public/app.js` `handoff()` |
+| I4 | Sign-out calls `supabase.auth.signOut()` with the library's default global scope, which also revokes the member's other sessions, including Ored AI. That is safe, but contradicts "You are still signed in on Ored AI". Use `{ scope: 'local' }` if the message is the intent | `public/app.js` sign-out handler |
 | I5 | `oredIsStaff()` is unused and would put an unvalidated id into a filter if it were ever used | `functions/lib/ored-sb.js` |
 | I6 | `ored_messages` keeps raw chat text and `ored_rate_hits` keeps client IPs; service-role only. Consider a retention period | Supabase |
 | I7 | Advisors: security — only "RLS enabled, no policy" (INFO) on all 12 tables, which is the intended design; performance — unused indexes only | Supabase |
@@ -125,7 +125,7 @@ No secret value appears in this document.
 
 * **Secrets:** no service-role key, JWT secret, database password, private key, Cloudflare credential or `.env`/`.dev.vars`/`config.js` file is in the tree or anywhere in history. The historical "password" hit was a login-form field; README hits are placeholders. The only secret found is H1.
 * **Database (live):** RLS is enabled and forced on all 12 `ored_*` tables, with no policies and no `anon` or `authenticated` grant on any table, view or function. The three `SECURITY DEFINER` functions (`ored_rate_take`, `ored_touch_conversation`, `rls_auto_enable`) have fixed `search_path` and are not executable by the browser roles. Every other function uses `search_path = ''`; the only dynamic SQL is in the DDL event trigger. Storage buckets are private with no policies: `anon` sees 0 of the 12 stored objects and cannot insert. 23 role-switched probes (read, write, `verified = true`, promotion, finalize, delete, register, claim, rate RPC, lineage, staff) were all refused.
-* **Authentication:** the Worker validates every bearer token by calling `/auth/v1/user` on the DigiArtz project. A token from any other project, or an invalid or expired one, is treated as anonymous and never trusted. `user_id` and `visitor` come only from the verified token; client-supplied values are ignored (tested). `state` is a random UUID kept in `sessionStorage`, required, compared and consumed once. `redirect_uri` is always this origin. Tokens are stripped from the URL at once and never logged. `supabase-js` stores the session in `localStorage`; the CSP (`script-src 'self'`, no inline script) and `textContent`-only rendering are what protect it.
+* **Authentication:** the Worker validates every bearer token by calling `/auth/v1/user` on the Ored AI project. A token from any other project, or an invalid or expired one, is treated as anonymous and never trusted. `user_id` and `visitor` come only from the verified token; client-supplied values are ignored (tested). `state` is a random UUID kept in `sessionStorage`, required, compared and consumed once. `redirect_uri` is always this origin. Tokens are stripped from the URL at once and never logged. `supabase-js` stores the session in `localStorage`; the CSP (`script-src 'self'`, no inline script) and `textContent`-only rendering are what protect it.
 * **Authorization / IDOR:** there is no read endpoint for conversations or messages (history lives in the browser). Writes check ownership: user B or a guest cannot write into user A's conversation (tested); see L1 for guest-to-guest. No endpoint exposes training data, sessions, workers, checkpoints, versions, configuration or staff functions; only `state` and `send` exist, and unknown actions (including `__proto__` and `constructor`) return 404.
 * **Injection:** ids that reach PostgREST from the web are checked against a UUID pattern. Python filters use `urllib.parse.quote`. Training-data filters are validated slugs and tags before any query (hostile tags and filters tested). SQL uses parameters or `format(%L/%I)`. `subprocess` is used only with argument lists and no shell (hostile `torchrun` values stay single arguments, tested).
 * **File system:** snapshot folders are `safe_tag(tag)/<hex>` under `snapshot_dir`; Storage paths use `safe_name(run_name)`. The `--run-name` and config paths an operator types are trusted input. Traversal-shaped tags, run names, snapshot references and shard names were tested.
@@ -147,7 +147,7 @@ No secret value appears in this document.
 | Checkpoint abuse simulation on the live DB | 11 cases, rolled back | 10 refused, 1 accepted (L7) |
 | Training-data invariants on the live DB | `ored/supabase/tests/training_data_invariants.sql`, rolled back | all passed |
 | Checkpoint invariants | `ored/supabase/tests/checkpoint_invariants.sql` on local Postgres | all passed |
-| Worker / `/api/ored` harness | real `worker.js` in Node 22, stubbed DigiArtz auth, PostgREST and model server | 34 / 34 as expected |
+| Worker / `/api/ored` harness | real `worker.js` in Node 22, stubbed Ored AI auth, PostgREST and model server | 34 / 34 as expected |
 | Sign-in hand-off | real `landing()` from `public/app.js`, 10 cases | 10 / 10 |
 | Model server, training data, traversal, injection, redaction | `tests/test_security.py` | all passed |
 | Whole Python suite after the fixes | `pytest` (390 tests) | 388 passed, 2 skipped (need Postgres binaries as a non-root user; skipped before this audit too) |
@@ -158,8 +158,8 @@ Harness cases: methods (GET 404, PUT/OPTIONS 405, no CORS headers); origin (none
 
 ## Limits of this audit
 
-* The container's network policy blocks `*.supabase.co` and `ored.digiartz.net`, so no HTTP request reached the live Worker, PostgREST, GraphQL or Storage APIs. The live checks ran inside Postgres as the same roles those APIs use; the HTTP layers were exercised locally with the real code.
-* The model server that `ORED_API_URL` points to, the Cloudflare account settings, and the DigiArtz project (including `/authorize`) were not reachable and were not inspected.
+* The container's network policy blocks `*.supabase.co` and `oredlab.com`, so no HTTP request reached the live Worker, PostgREST, GraphQL or Storage APIs. The live checks ran inside Postgres as the same roles those APIs use; the HTTP layers were exercised locally with the real code.
+* The model server that `ORED_API_URL` points to, the Cloudflare account settings, and the Ored AI project (including `/authorize`) were not reachable and were not inspected.
 * No load, fuzzing or timing test was run, by design.
 
 ## Remaining recommendations, in order

@@ -15,7 +15,7 @@
   var cfg = window.ORED_CONFIG || {};
   var AUTH_URL = String(cfg.AUTH_URL || '');
   var AUTH_KEY = String(cfg.AUTH_KEY || '');
-  var SITE_URL = String(cfg.SITE_URL || 'https://digiartz.net');
+  var SITE_URL = String(cfg.SITE_URL || 'https://oredlab.com');
   var sb = null;
 
   var main = document.getElementById('oMain');
@@ -302,7 +302,7 @@
     try { return new URL(SITE_URL).origin; } catch (e) { return ''; }
   }
 
-  var NO_SITE = 'Ored does not know where DigiArtz is. Refresh and try again.';
+  var NO_SITE = 'Ored does not know where Ored AI is. Refresh and try again.';
 
   function handoff(silent) {
     var origin = siteOrigin();
@@ -321,7 +321,7 @@
   function signIn() {
     flagDrop('sessionStorage', OFF_KEY);
     authGo.disabled = true;
-    sayAuth('Taking you to DigiArtz\u2026');
+    sayAuth('Taking you to Ored AI\u2026');
     if (handoff(false)) return;
     authGo.disabled = false;
     sayAuth(NO_SITE, true);
@@ -348,7 +348,7 @@
     flagDrop('localStorage', SEEN_KEY);
     if (sb) { try { await sb.auth.signOut(); } catch (e) {   } }
     showChat('');
-    say('Signed out. You are still signed in on DigiArtz.');
+    say('Signed out. You are still signed in on Ored AI.');
   });
 
   form.addEventListener('submit', function (event) {
@@ -416,7 +416,7 @@
     var refresh = hash.get('refresh_token') || '';
     var state = pick('state');
     var error = pick('error_description') || pick('error');
-    var invited = query.has('sso') || query.get('from') === 'digiartz';
+    var invited = query.has('sso') || query.get('from') === 'oredlab';
     var misplaced = query.has('access_token') || query.has('refresh_token');
 
     if (!access && !error && !invited && !misplaced) return null;

@@ -27,7 +27,7 @@ export default {
       const config = {
         AUTH_URL: String(env.ORED_AUTH_URL || '').trim().replace(/\/$/, ''),
         AUTH_KEY: String(env.ORED_AUTH_KEY || '').trim(),
-        SITE_URL: String(env.ORED_SITE_URL || 'https://digiartz.net').trim().replace(/\/$/, ''),
+        SITE_URL: String(env.ORED_SITE_URL || 'https://oredlab.com').trim().replace(/\/$/, ''),
       };
       return sealed(new Response('window.ORED_CONFIG = ' + JSON.stringify(config) + ';\n', {
         headers: {

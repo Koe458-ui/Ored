@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /ored/model/
 
-Sitemap: https://ored.digiartz.net/sitemap.xml
+Sitemap: https://oredlab.com/sitemap.xml

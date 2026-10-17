@@ -1167,18 +1167,18 @@ here reads a table belonging to another product, and the only schema outside
 | `ORED_R2_ACCESS_KEY_ID` | R2 API token access key (Object Read & Write) | **yes — server only** |
 | `ORED_R2_SECRET_ACCESS_KEY` | R2 API token secret | **yes — server only** |
 | `ORED_SB_MAX_OBJECT_MB` | largest single Storage object; bigger files are split into parts, default `45` | no |
-| `ORED_AUTH_URL` | web backend, to verify a DigiArtz token | no |
-| `ORED_AUTH_KEY` | web backend, publishable key of the DigiArtz project | no |
+| `ORED_AUTH_URL` | web backend, to verify an Ored AI token | no |
+| `ORED_AUTH_KEY` | web backend, publishable key of the Ored AI project | no |
 | `ORED_ALLOWED_ORIGINS` | web backend, extra origins allowed to post | no |
 | `ORED_API_URL` | the web backend, pointing at `scripts/serve.py` | no |
 | `ORED_API_KEY` | the web backend and the serving process | **yes — server only** |
 
-Ored has no accounts of its own. People sign in with their DigiArtz account, and
-the backend checks that token against the DigiArtz project before it writes
+Ored has no accounts of its own. People sign in with their Ored AI account, and
+the backend checks that token against the Ored AI project before it writes
 anything. What it writes goes to Ored's own project under the service key.
 
 The browser never holds an Ored project credential of any kind. `ored/config.js`
-carries the DigiArtz project URL and its publishable key, and nothing else.
+carries the Ored AI project URL and its publishable key, and nothing else.
 
 ### Tables
 
@@ -1190,11 +1190,11 @@ carries the DigiArtz project URL and its publishable key, and nothing else.
 Row level security is enabled **and forced** on every one of them, and not one
 carries a policy. `anon` and `authenticated` hold no grant on any table and no
 grant on the schema, so a browser cannot read a row of Ored data even with a
-valid DigiArtz token — that token was signed by a different project and means
+valid Ored AI token — that token was signed by a different project and means
 nothing here. Every read and write goes through the backend or the trainer on
 the service key, which is the only thing that reaches this data at all.
 
-`user_id`, `reviewed_by` and `approved_by` hold DigiArtz user ids. They are
+`user_id`, `reviewed_by` and `approved_by` hold Ored AI user ids. They are
 plain uuid columns with no foreign key, because the accounts they name live in
 a different project.
 

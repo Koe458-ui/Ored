@@ -7,23 +7,23 @@ flow chart
 
 GitHub (ver 1 work flow )
 │
-├── DigiArtz
+├── Ored AI
 │   └── Public website
 │
-└── DigiArtz-AI-Moderation
+└── Ored-AI-Moderation
     ├── AI model
     ├── Training
     ├── Inference API
     └── Admin Console
 
 Deployment workflow (ver 1)
-DigiArtz users
+Ored AI users
       │
       ▼
-digiartz.net
+oredlab.com
       │
       ▼
-DigiArtz backend
+Ored AI backend
       │
       ▼
 AI Moderation API
@@ -37,8 +37,8 @@ Admin
       ▼
 Private Moderation Console
 
-DAAI in website workflow (ver 1)
-DigiArtz user uploads image
+Ored AI in website workflow (ver 1)
+Ored AI user uploads image
         ↓
 Normal upload validation
         ↓
@@ -72,5 +72,5 @@ Test new model
 Deploy new version
 
 private URL
-ORED.digiartz.net
-ored.digiartz.net
+oredlab.com
+oredlab.com
