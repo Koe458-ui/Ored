@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 
 from ored.data.facts import Fact, FactSpec, generate_fact_corpus

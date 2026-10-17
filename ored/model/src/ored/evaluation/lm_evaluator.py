@@ -56,7 +56,6 @@ def load_language_model(
 def measure_splits(model, cfg: Config, device: torch.device,
                    splits: List[str]) -> Dict[str, Dict[str, float]]:
     datasets, _ = build_text_datasets(cfg)
-    criterion = torch.nn.CrossEntropyLoss()
 
     results: Dict[str, Dict[str, float]] = {}
     for split in splits:

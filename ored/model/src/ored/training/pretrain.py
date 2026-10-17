@@ -16,7 +16,6 @@ from torch.utils.data import DataLoader, Sampler, Subset
 
 from ored.config import Config, load_config
 from ored.data.token_shards import (
-    ShardError,
     TokenWindowDataset,
     dataset_identity,
     load_manifest,

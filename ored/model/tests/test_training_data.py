@@ -24,7 +24,6 @@ from ored.data.training_data import (
     TYPES,
     Selection,
     check_record,
-    fingerprint,
     fingerprint_of,
     format_record,
     normalise_fields,

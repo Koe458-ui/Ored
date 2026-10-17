@@ -5,7 +5,6 @@ import torch
 
 from ored.data.corpus import load_arithmetic_pairs, make_arithmetic, read_corpus
 from ored.data.text_dataset import TextDataset, build_text_dataloaders, build_text_datasets
-from ored.data.tokenizer import CharTokenizer
 
 
 def test_targets_are_inputs_shifted_by_one():
