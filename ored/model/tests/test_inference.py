@@ -3,10 +3,9 @@ from __future__ import annotations
 import pytest
 import torch
 
-from ored.evaluation.evaluator import evaluate_checkpoint
 from ored.inference.predictor import (
+    BasePredictor,
     LanguageModelPredictor,
-    Predictor,
     load_predictor,
     resolve_task,
 )
@@ -15,61 +14,9 @@ from ored.training.trainer import Trainer
 from ored.utils.checkpoint import CheckpointError
 
 
-@pytest.fixture()
-def trained_checkpoint(tiny_dataset):
-    tiny_dataset.training.epochs = 40
-    Trainer(tiny_dataset).fit()
-    return tiny_dataset.checkpoint_dir / "best.pt"
-
-
-def test_predictor_loads_and_predicts(trained_checkpoint, tiny_dataset):
-    predictor = Predictor.from_checkpoint(trained_checkpoint, device="cpu")
-    prediction = predictor.predict(1, 2)
-
-    assert isinstance(prediction.predicted, int)
-    assert len(prediction.predicted_bits) == tiny_dataset.data.output_size
-    assert 0.0 <= prediction.confidence <= 1.0
-    assert prediction.expected == 3
-
-
-def test_predictor_is_in_eval_mode(trained_checkpoint):
-    predictor = Predictor.from_checkpoint(trained_checkpoint, device="cpu")
-    assert predictor.model.training is False, "model must be in eval mode for inference"
-
-
-def test_predictions_are_deterministic(trained_checkpoint):
-    predictor = Predictor.from_checkpoint(trained_checkpoint, device="cpu")
-    assert predictor.predict(2, 3).predicted == predictor.predict(2, 3).predicted
-
-
-def test_loaded_weights_match_the_checkpoint(trained_checkpoint):
-    from ored.utils.checkpoint import load_checkpoint
-
-    predictor = Predictor.from_checkpoint(trained_checkpoint, device="cpu")
-    payload = load_checkpoint(trained_checkpoint)
-    for key, tensor in predictor.model.state_dict().items():
-        assert torch.allclose(payload["model_state_dict"][key], tensor)
-
-
-def test_out_of_range_input_is_rejected(trained_checkpoint, tiny_dataset):
-    predictor = Predictor.from_checkpoint(trained_checkpoint, device="cpu")
-    too_big = 2**tiny_dataset.data.n_bits
-    with pytest.raises(ValueError, match="out of range"):
-        predictor.predict(too_big, 0)
-    with pytest.raises(ValueError):
-        predictor.predict(-1, 0)
-
-
 def test_missing_checkpoint_gives_a_helpful_error(tmp_path):
     with pytest.raises(FileNotFoundError, match="Train a model first"):
-        Predictor.from_checkpoint(tmp_path / "nope.pt")
-
-
-def test_evaluate_checkpoint_reports_all_splits(trained_checkpoint):
-    results = evaluate_checkpoint(trained_checkpoint, device="cpu", show_errors=0)
-    for split in ("train", "val", "test"):
-        assert 0.0 <= results[split]["exact_acc"] <= 1.0
-        assert results[split]["examples"] > 0
+        BasePredictor.from_checkpoint(tmp_path / "nope.pt")
 
 
 @pytest.fixture()
@@ -133,7 +80,7 @@ def test_language_model_weights_match_the_checkpoint(trained_lm_checkpoint):
 
 
 def test_predictor_class_dispatches_on_the_checkpoint_task(trained_lm_checkpoint):
-    predictor = Predictor.from_checkpoint(trained_lm_checkpoint, device="cpu")
+    predictor = BasePredictor.from_checkpoint(trained_lm_checkpoint, device="cpu")
     assert isinstance(predictor, LanguageModelPredictor)
 
 
@@ -171,23 +118,11 @@ def test_language_model_cli_completes_text(trained_lm_checkpoint):
     assert "5 + 6 = " in stream.getvalue()
 
 
-def test_default_checkpoint_falls_back_to_the_language_model(tmp_path, monkeypatch):
-    from ored.inference.predictor import (
-        DEFAULT_CHECKPOINT,
-        LM_CHECKPOINT,
-        resolve_checkpoint,
-    )
+def test_the_default_checkpoint_is_the_transformer():
+    from ored.inference.predictor import DEFAULT_CHECKPOINT, resolve_checkpoint
 
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "checkpoints" / "char_transformer").mkdir(parents=True)
-    (tmp_path / LM_CHECKPOINT).touch()
-
-    assert resolve_checkpoint() == LM_CHECKPOINT
+    assert resolve_checkpoint() == DEFAULT_CHECKPOINT == "checkpoints/char_transformer/best.pt"
     assert resolve_checkpoint("somewhere/else.pt") == "somewhere/else.pt"
-
-    (tmp_path / "checkpoints" / "bit_adder_mlp").mkdir(parents=True)
-    (tmp_path / DEFAULT_CHECKPOINT).touch()
-    assert resolve_checkpoint() == DEFAULT_CHECKPOINT
 
 
 def _payload(path):
@@ -241,14 +176,6 @@ def test_state_dict_loading_stays_strict(trained_lm_checkpoint, tmp_path):
         load_predictor(incomplete, device="cpu")
 
 
-def test_bit_adder_checkpoint_still_loads_as_a_bit_predictor(trained_checkpoint):
-    predictor = load_predictor(trained_checkpoint, device="cpu")
-
-    assert isinstance(predictor, Predictor)
-    assert not isinstance(predictor, LanguageModelPredictor)
-    assert predictor.predict(1, 2).expected == 3
-
-
 def test_char_transformer_checkpoint_runs_through_the_cli(trained_lm_checkpoint, tmp_path):
     import io
     import logging
@@ -274,7 +201,3 @@ def test_char_transformer_checkpoint_runs_through_the_cli(trained_lm_checkpoint,
     assert "3 + 4 = " in output
     assert "bits " not in output
 
-
-def test_bit_evaluator_refuses_a_language_model_checkpoint(trained_lm_checkpoint):
-    with pytest.raises(ValueError, match="holds a language model"):
-        evaluate_checkpoint(trained_lm_checkpoint, device="cpu", show_errors=0)

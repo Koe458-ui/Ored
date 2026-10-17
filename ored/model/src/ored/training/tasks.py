@@ -59,52 +59,6 @@ class Task:
         return []
 
 
-@register_task("bit_addition")
-class BitAdditionTask(Task):
-
-    def __init__(self, cfg: Config) -> None:
-        super().__init__(cfg)
-        from ored.training.trainer import build_criterion
-        self.criterion = build_criterion(cfg.training.loss)
-
-    def build_data(self, generator=None):
-        from ored.data.dataset import build_dataloaders
-        loaders, datasets = build_dataloaders(self.cfg, generator=generator)
-        return loaders, datasets
-
-    def build_model(self) -> nn.Module:
-        return build_model(self.cfg)
-
-    def compute_loss(self, model, batch, device):
-        from ored.training.metrics import bit_accuracy, exact_match_accuracy
-
-        inputs, targets = batch
-        inputs = inputs.to(device)
-        targets = targets.to(device)
-
-        logits = model(inputs)
-        loss = self.criterion(logits, targets)
-
-        metrics = {
-            "bit_acc": bit_accuracy(logits, targets),
-            "exact_acc": exact_match_accuracy(logits, targets),
-        }
-        return loss, metrics, inputs.size(0)
-
-    @property
-    def metric_names(self) -> List[str]:
-        return ["bit_acc", "exact_acc"]
-
-    def describe_data(self, datasets):
-        return [datasets[name].describe() for name in ("train", "val", "test")]
-
-    def next_steps(self):
-        return [
-            f"python scripts/evaluate.py --checkpoint {self.cfg.checkpoint_dir}/best.pt",
-            "python scripts/infer.py --a 9 --b 6",
-        ]
-
-
 @register_task("language_model")
 class LanguageModelTask(Task):
 

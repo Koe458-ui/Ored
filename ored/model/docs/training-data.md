@@ -32,8 +32,7 @@ ored_checkpoints rows (session_id) ──► ored_model_versions (candidate, nev
 The conversation-learning path (`ored_conversations` → `ored_learning_candidates`
 → `ored_training_examples`) is untouched and separate. The generated corpus
 (`scripts/generate_corpus.py`) still works exactly as before, but it is no
-longer the default: `configs/char_transformer.yaml` and `configs/char_bigram.yaml`
-set `data.source: supabase` with `dataset_tag: all`, so a plain
+longer the default: `configs/char_transformer.yaml` set `data.source: supabase` with `dataset_tag: all`, so a plain
 `python scripts/train.py --config configs/char_transformer.yaml --set run_name=ored_v207 --upload`
 trains on every enabled, verified row. Training on the generated corpus needs
 the explicit `--generated-corpus` flag (or `--set data.source=generated`); the

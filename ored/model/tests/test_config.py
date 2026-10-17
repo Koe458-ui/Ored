@@ -6,24 +6,23 @@ import pytest
 
 from ored.config import Config, config_from_dict, load_config
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "bit_adder_mlp.yaml"
+CONFIG_PATH = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
 
 
 def test_loads_the_real_config():
     cfg = load_config(CONFIG_PATH)
     assert isinstance(cfg, Config)
     assert cfg.data.split.train > 0
-    assert cfg.data.input_size == 2 * cfg.data.n_bits
-    assert cfg.data.output_size == cfg.data.n_bits + 1
+    assert cfg.model.name == "transformer" and cfg.task == "language_model"
 
 
 def test_overrides_are_typed():
-    cfg = load_config(CONFIG_PATH, ["training.epochs=3", "model.hidden_sizes=[8,4]",
-                                    "deterministic=false", "model.activation=relu"])
+    cfg = load_config(CONFIG_PATH, ["training.epochs=3", "model.d_model=64",
+                                    "deterministic=false", "model.attention=sdpa"])
     assert cfg.training.epochs == 3 and isinstance(cfg.training.epochs, int)
-    assert cfg.model.hidden_sizes == [8, 4]
+    assert cfg.model.d_model == 64
     assert cfg.deterministic is False
-    assert cfg.model.activation == "relu"
+    assert cfg.model.attention == "sdpa"
 
 
 def test_typo_in_override_is_rejected():
@@ -37,13 +36,25 @@ def test_invalid_values_are_rejected():
     with pytest.raises(ValueError):
         load_config(CONFIG_PATH, ["data.split.train=0.9"])
     with pytest.raises(ValueError):
-        load_config(CONFIG_PATH, ["model.hidden_sizes=[]"])
+        load_config(CONFIG_PATH, ["model.n_head=3"])
+    with pytest.raises(ValueError, match="model.name must be transformer"):
+        load_config(CONFIG_PATH, ["model.name=mlp"])
+    with pytest.raises(ValueError, match="task must be language_model"):
+        load_config(CONFIG_PATH, ["task=bit_addition"])
 
 
 def test_round_trip_through_dict():
     cfg = load_config(CONFIG_PATH)
     rebuilt = config_from_dict(cfg.to_dict())
     assert rebuilt.to_dict() == cfg.to_dict()
+
+
+def test_checkpoints_saved_with_the_retired_mlp_keys_still_load():
+    cfg = load_config(CONFIG_PATH)
+    saved = cfg.to_dict()
+    saved["data"].update(n_bits=4, raw_path="data/raw/bit_addition.csv")
+    saved["model"].update(hidden_sizes=[32, 32], activation="relu")
+    assert config_from_dict(saved).to_dict() == cfg.to_dict()
 
 
 def test_text_settings_stay_text_when_they_look_like_numbers():

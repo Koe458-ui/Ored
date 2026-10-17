@@ -67,23 +67,23 @@ def test_the_rule_reads_format_1_metric_names():
     assert PromotionRule().value({"val_loss": 0.3, "loss": 0.4}) == 0.3
 
 
-def test_bad_checkpoint_settings_are_rejected(tiny_cfg):
-    tiny_cfg.checkpoint.best_mode = "lower"
+def test_bad_checkpoint_settings_are_rejected(tiny_lm_cfg):
+    tiny_lm_cfg.checkpoint.best_mode = "lower"
     with pytest.raises(ValueError, match="best_mode"):
-        tiny_cfg.validate()
-    tiny_cfg.checkpoint.best_mode = "min"
-    tiny_cfg.checkpoint.keep_history = True
-    tiny_cfg.checkpoint.save_history_every_epochs = 0
+        tiny_lm_cfg.validate()
+    tiny_lm_cfg.checkpoint.best_mode = "min"
+    tiny_lm_cfg.checkpoint.keep_history = True
+    tiny_lm_cfg.checkpoint.save_history_every_epochs = 0
     with pytest.raises(ValueError, match="keep_history"):
-        tiny_cfg.validate()
+        tiny_lm_cfg.validate()
 
 
-def test_each_role_has_the_state_it_needs(tiny_dataset):
-    tiny_dataset.checkpoint.keep_history = True
-    tiny_dataset.checkpoint.export_on_finish = True
-    trainer = Trainer(tiny_dataset)
+def test_each_role_has_the_state_it_needs(tiny_corpus):
+    tiny_corpus.checkpoint.keep_history = True
+    tiny_corpus.checkpoint.export_on_finish = True
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
-    d = tiny_dataset.checkpoint_dir
+    d = tiny_corpus.checkpoint_dir
 
     base = load_checkpoint(d / "base.pt")
     assert base["checkpoint_kind"] == "base" and base["epoch"] == 0 and base["global_step"] == 0
@@ -107,37 +107,37 @@ def test_each_role_has_the_state_it_needs(tiny_dataset):
 
     for payload in (base, live, best, export):
         assert payload["format_version"] == CHECKPOINT_FORMAT_VERSION
-        assert payload["architecture"]["type"] == "MLP"
+        assert payload["architecture"]["type"] == "Transformer"
         assert payload["torch_version"] and payload["created_at"]
 
 
-def test_best_is_the_epoch_with_the_lowest_validation_loss(tiny_dataset):
-    tiny_dataset.training.epochs = 12
-    trainer = Trainer(tiny_dataset)
+def test_best_is_the_epoch_with_the_lowest_validation_loss(tiny_corpus):
+    tiny_corpus.training.epochs = 4
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
 
     losses = [r["val_loss"] for r in trainer.history]
     best_epoch = losses.index(min(losses)) + 1
-    best = load_checkpoint(tiny_dataset.checkpoint_dir / "best.pt")
+    best = load_checkpoint(tiny_corpus.checkpoint_dir / "best.pt")
     assert best["epoch"] == best_epoch == trainer.best_epoch
     assert best["promotion"] == {"metric": "val_loss", "mode": "min",
                                  "value": min(losses), "epoch": best_epoch}
 
 
-def test_best_can_follow_a_higher_is_better_metric(tiny_dataset):
-    tiny_dataset.training.epochs = 12
-    tiny_dataset.checkpoint.best_metric = "val_exact_acc"
-    tiny_dataset.checkpoint.best_mode = "max"
-    trainer = Trainer(tiny_dataset)
+def test_best_can_follow_a_higher_is_better_metric(tiny_corpus):
+    tiny_corpus.training.epochs = 4
+    tiny_corpus.checkpoint.best_metric = "val_bpc"
+    tiny_corpus.checkpoint.best_mode = "max"
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
 
-    accs = [r["val_exact_acc"] for r in trainer.history]
-    best = load_checkpoint(tiny_dataset.checkpoint_dir / "best.pt")
-    assert best["metrics"]["val_exact_acc"] == max(accs)
-    assert best["epoch"] == accs.index(max(accs)) + 1
+    bpcs = [r["val_bpc"] for r in trainer.history]
+    best = load_checkpoint(tiny_corpus.checkpoint_dir / "best.pt")
+    assert best["metrics"]["val_bpc"] == max(bpcs)
+    assert best["epoch"] == bpcs.index(max(bpcs)) + 1
 
 
-def test_worse_epochs_do_not_overwrite_best(tiny_dataset, monkeypatch):
+def test_worse_epochs_do_not_overwrite_best(tiny_corpus, monkeypatch):
     manager_writes = []
     original = CheckpointManager._write
 
@@ -146,19 +146,19 @@ def test_worse_epochs_do_not_overwrite_best(tiny_dataset, monkeypatch):
         return original(self, kind, path, snapshot)
 
     monkeypatch.setattr(CheckpointManager, "_write", recording)
-    tiny_dataset.training.epochs = 12
-    Trainer(tiny_dataset).fit()
+    tiny_corpus.training.epochs = 4
+    Trainer(tiny_corpus).fit()
 
     bests = [loss for kind, loss in manager_writes if kind == "best"]
     assert bests == sorted(bests, reverse=True), "each promoted best must beat the previous one"
     assert len(set(bests)) == len(bests)
 
 
-def test_history_is_saved_at_the_chosen_interval(tiny_dataset):
-    tiny_dataset.training.epochs = 5
-    tiny_dataset.checkpoint.keep_history = True
-    tiny_dataset.checkpoint.save_history_every_epochs = 2
-    trainer = Trainer(tiny_dataset)
+def test_history_is_saved_at_the_chosen_interval(tiny_corpus):
+    tiny_corpus.training.epochs = 5
+    tiny_corpus.checkpoint.keep_history = True
+    tiny_corpus.checkpoint.save_history_every_epochs = 2
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
 
     files = trainer.checkpoints.history_files()
@@ -169,29 +169,30 @@ def test_history_is_saved_at_the_chosen_interval(tiny_dataset):
         assert f.name == f"epoch_{payload['epoch']:04d}_step_{payload['global_step']:08d}.pt"
 
 
-def test_history_can_follow_steps(tiny_dataset):
-    tiny_dataset.training.epochs = 2
-    tiny_dataset.checkpoint.keep_history = True
-    tiny_dataset.checkpoint.save_history_every_epochs = 0
-    tiny_dataset.checkpoint.save_history_every_steps = 4
-    trainer = Trainer(tiny_dataset)
+def test_history_can_follow_steps(tiny_corpus):
+    tiny_corpus.training.epochs = 2
+    tiny_corpus.checkpoint.keep_history = True
+    tiny_corpus.checkpoint.save_history_every_epochs = 0
+    tiny_corpus.checkpoint.save_history_every_steps = 4
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
     steps = [load_checkpoint(f)["global_step"] for f in trainer.checkpoints.history_files()]
     assert steps == list(range(4, trainer.global_step + 1, 4))
 
 
-def test_no_history_unless_asked(tiny_dataset):
-    trainer = Trainer(tiny_dataset)
+def test_no_history_unless_asked(tiny_corpus):
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
     assert trainer.checkpoints.history_files() == []
 
 
-def test_resume_from_live_at_an_epoch_boundary_matches_one_run(tiny_dataset, tmp_path, monkeypatch):
-    tiny_dataset.model.dropout = 0.2
-    straight = Trainer(fresh(tiny_dataset, tmp_path / "straight"))
+def test_resume_from_live_at_an_epoch_boundary_matches_one_run(tiny_corpus, tmp_path, monkeypatch):
+    tiny_corpus.model.dropout = 0.2
+    tiny_corpus.training.epochs = 4
+    straight = Trainer(fresh(tiny_corpus, tmp_path / "straight"))
     straight.fit()
 
-    cfg = fresh(tiny_dataset, tmp_path / "interrupted")
+    cfg = fresh(tiny_corpus, tmp_path / "interrupted")
     first = Trainer(cfg)
     steps_per_epoch = first.steps_per_epoch
     crash_at(monkeypatch, 2 * steps_per_epoch + 1)
@@ -211,14 +212,14 @@ def test_resume_from_live_at_an_epoch_boundary_matches_one_run(tiny_dataset, tmp
     assert_same_weights(params(resumed.model), params(straight.model))
 
 
-def test_resume_from_a_mid_epoch_live_matches_one_run(tiny_dataset, tmp_path, monkeypatch):
-    tiny_dataset.model.dropout = 0.2
-    tiny_dataset.checkpoint.save_live_every_epochs = 0
-    tiny_dataset.checkpoint.save_live_every_steps = 4
-    straight = Trainer(fresh(tiny_dataset, tmp_path / "straight"))
+def test_resume_from_a_mid_epoch_live_matches_one_run(tiny_corpus, tmp_path, monkeypatch):
+    tiny_corpus.model.dropout = 0.2
+    tiny_corpus.checkpoint.save_live_every_epochs = 0
+    tiny_corpus.checkpoint.save_live_every_steps = 4
+    straight = Trainer(fresh(tiny_corpus, tmp_path / "straight"))
     straight.fit()
 
-    cfg = fresh(tiny_dataset, tmp_path / "interrupted")
+    cfg = fresh(tiny_corpus, tmp_path / "interrupted")
     first = Trainer(cfg)
     crash_step = first.steps_per_epoch + 3
     crash_at(monkeypatch, crash_step)
@@ -239,15 +240,15 @@ def test_resume_from_a_mid_epoch_live_matches_one_run(tiny_dataset, tmp_path, mo
     assert_same_weights(params(resumed.model), params(straight.model))
 
 
-def test_resume_from_a_live_saved_on_the_last_batch_of_an_epoch(tiny_dataset, tmp_path, monkeypatch):
-    tiny_dataset.model.dropout = 0.2
-    probe = Trainer(fresh(tiny_dataset, tmp_path / "probe"))
-    tiny_dataset.checkpoint.save_live_every_epochs = 0
-    tiny_dataset.checkpoint.save_live_every_steps = probe.steps_per_epoch
-    straight = Trainer(fresh(tiny_dataset, tmp_path / "straight"))
+def test_resume_from_a_live_saved_on_the_last_batch_of_an_epoch(tiny_corpus, tmp_path, monkeypatch):
+    tiny_corpus.model.dropout = 0.2
+    probe = Trainer(fresh(tiny_corpus, tmp_path / "probe"))
+    tiny_corpus.checkpoint.save_live_every_epochs = 0
+    tiny_corpus.checkpoint.save_live_every_steps = probe.steps_per_epoch
+    straight = Trainer(fresh(tiny_corpus, tmp_path / "straight"))
     straight.fit()
 
-    cfg = fresh(tiny_dataset, tmp_path / "interrupted")
+    cfg = fresh(tiny_corpus, tmp_path / "interrupted")
     first = Trainer(cfg)
     original = Trainer.evaluate
 
@@ -272,56 +273,56 @@ def test_resume_from_a_live_saved_on_the_last_batch_of_an_epoch(tiny_dataset, tm
     assert_same_weights(params(resumed.model), params(straight.model))
 
 
-def test_resume_without_live_explains_itself(tiny_dataset):
-    tiny_dataset.training.resume = "live"
+def test_resume_without_live_explains_itself(tiny_corpus):
+    tiny_corpus.training.resume = "live"
     with pytest.raises(NoResumableCheckpoint, match="There is no live checkpoint"):
-        Trainer(tiny_dataset)
+        Trainer(tiny_corpus)
 
 
-def test_resume_live_never_falls_back_to_best(tiny_dataset):
-    Trainer(tiny_dataset).fit()
-    (tiny_dataset.checkpoint_dir / "live.pt").unlink()
-    assert (tiny_dataset.checkpoint_dir / "best.pt").exists()
+def test_resume_live_never_falls_back_to_best(tiny_corpus):
+    Trainer(tiny_corpus).fit()
+    (tiny_corpus.checkpoint_dir / "live.pt").unlink()
+    assert (tiny_corpus.checkpoint_dir / "best.pt").exists()
 
-    tiny_dataset.training.resume = "live"
+    tiny_corpus.training.resume = "live"
     with pytest.raises(NoResumableCheckpoint):
-        Trainer(tiny_dataset)
+        Trainer(tiny_corpus)
 
 
-def test_a_best_file_in_the_live_slot_is_refused(tiny_dataset):
-    Trainer(tiny_dataset).fit()
-    d = tiny_dataset.checkpoint_dir
+def test_a_best_file_in_the_live_slot_is_refused(tiny_corpus):
+    Trainer(tiny_corpus).fit()
+    d = tiny_corpus.checkpoint_dir
     shutil.copy(d / "best.pt", d / "live.pt")
 
-    tiny_dataset.training.resume = "live"
+    tiny_corpus.training.resume = "live"
     with pytest.raises(CheckpointError, match="is a best checkpoint, not live"):
-        Trainer(tiny_dataset)
+        Trainer(tiny_corpus)
 
 
-def test_resuming_a_finished_run_trains_nothing(tiny_dataset):
-    trainer = Trainer(tiny_dataset)
+def test_resuming_a_finished_run_trains_nothing(tiny_corpus):
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
-    tiny_dataset.training.resume = "live"
-    again = Trainer(tiny_dataset)
+    tiny_corpus.training.resume = "live"
+    again = Trainer(tiny_corpus)
     again.fit()
     assert again.global_step == trainer.global_step
     assert_same_weights(params(again.model), params(trainer.model))
 
 
-def test_resume_can_extend_a_run(tiny_dataset):
-    trainer = Trainer(tiny_dataset)
+def test_resume_can_extend_a_run(tiny_corpus):
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
-    tiny_dataset.training.resume = "live"
-    tiny_dataset.training.epochs += 2
-    longer = Trainer(tiny_dataset)
+    tiny_corpus.training.resume = "live"
+    tiny_corpus.training.epochs += 2
+    longer = Trainer(tiny_corpus)
     longer.fit()
     assert len(longer.history) == len(trainer.history) + 2
     assert longer.global_step == trainer.global_step + 2 * trainer.steps_per_epoch
 
 
-def test_an_unknown_format_is_named(tiny_dataset, tmp_path):
-    Trainer(tiny_dataset).fit()
-    raw = torch.load(tiny_dataset.checkpoint_dir / "best.pt", weights_only=True)
+def test_an_unknown_format_is_named(tiny_corpus, tmp_path):
+    Trainer(tiny_corpus).fit()
+    raw = torch.load(tiny_corpus.checkpoint_dir / "best.pt", weights_only=True)
     raw["format_version"] = 99
     torch.save(raw, tmp_path / "future.pt")
 
@@ -331,12 +332,12 @@ def test_an_unknown_format_is_named(tiny_dataset, tmp_path):
     assert f"Expected format: {CHECKPOINT_FORMAT_VERSION}" in str(err.value)
 
 
-def test_an_architecture_mismatch_is_named_before_pytorch_complains(tiny_dataset):
-    Trainer(tiny_dataset).fit()
-    other = copy.deepcopy(tiny_dataset)
-    other.model.hidden_sizes = [16]
+def test_an_architecture_mismatch_is_named_before_pytorch_complains(tiny_corpus):
+    Trainer(tiny_corpus).fit()
+    other = copy.deepcopy(tiny_corpus)
+    other.model.d_model = 64
     other.run_name = "other"
-    other.training.resume = str(tiny_dataset.checkpoint_dir / "best.pt")
+    other.training.resume = str(tiny_corpus.checkpoint_dir / "best.pt")
 
     with pytest.raises(CheckpointError) as err:
         Trainer(other)
@@ -344,9 +345,9 @@ def test_an_architecture_mismatch_is_named_before_pytorch_complains(tiny_dataset
     assert "Checkpoint format: 2" in str(err.value)
 
 
-def test_a_truncated_file_is_a_clear_error(tiny_dataset, tmp_path):
-    Trainer(tiny_dataset).fit()
-    data = (tiny_dataset.checkpoint_dir / "best.pt").read_bytes()
+def test_a_truncated_file_is_a_clear_error(tiny_corpus, tmp_path):
+    Trainer(tiny_corpus).fit()
+    data = (tiny_corpus.checkpoint_dir / "best.pt").read_bytes()
     (tmp_path / "cut.pt").write_bytes(data[: len(data) // 3])
     with pytest.raises(CheckpointError, match="not a readable checkpoint"):
         load_checkpoint(tmp_path / "cut.pt")
@@ -358,20 +359,21 @@ def test_a_positional_tuple_is_not_a_checkpoint(tmp_path):
         load_checkpoint(tmp_path / "tuple.pt")
 
 
-def test_format_1_checkpoints_still_load(tiny_dataset, tmp_path):
-    trainer = Trainer(tiny_dataset)
+def test_format_1_checkpoints_still_load(tiny_corpus, tmp_path):
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
-    v2 = torch.load(tiny_dataset.checkpoint_dir / "best.pt", weights_only=True)
+    v2 = torch.load(tiny_corpus.checkpoint_dir / "best.pt", weights_only=True)
     v1 = {
         "format_version": 1,
         "model_state": v2["model_state_dict"],
         "optimizer_state": v2["optimizer_state_dict"],
         "config": v2["config"],
         "epoch": v2["epoch"],
-        "metrics": {"loss": 0.4, "bit_acc": 0.9},
+        "metrics": {"loss": 0.4, "bpc": 0.9},
         "torch_version": "2.11.0+cu128",
         "saved_at": "2026-09-22 15:58:30",
-        "extra": {"model_description": {**v2["architecture"], "parameters": 1}},
+        "extra": {"model_description": {**v2["architecture"], "parameters": 1},
+                  "tokenizer": v2["tokenizer"]},
     }
     torch.save(v1, tmp_path / "old.pt")
 
@@ -382,27 +384,27 @@ def test_format_1_checkpoints_still_load(tiny_dataset, tmp_path):
     assert PromotionRule().value(payload["metrics"]) == 0.4
 
     predictor = load_predictor(tmp_path / "old.pt", device="cpu")
-    assert predictor.predict(1, 2).expected == 3
+    assert predictor.predict_sum(1, 2).expected == "3"
 
 
-def test_a_format_1_file_cannot_be_resumed_exactly(tiny_dataset, tmp_path):
-    Trainer(tiny_dataset).fit()
-    d = tiny_dataset.checkpoint_dir
+def test_a_format_1_file_cannot_be_resumed_exactly(tiny_corpus, tmp_path):
+    Trainer(tiny_corpus).fit()
+    d = tiny_corpus.checkpoint_dir
     v2 = torch.load(d / "live.pt", weights_only=True)
     torch.save({"format_version": 1, "model_state": v2["model_state_dict"], "config": v2["config"],
                 "epoch": 5, "metrics": {}}, d / "live.pt")
-    tiny_dataset.training.resume = "live"
+    tiny_corpus.training.resume = "live"
     with pytest.raises(NoResumableCheckpoint, match="warm-start"):
-        Trainer(tiny_dataset)
+        Trainer(tiny_corpus)
 
 
-def test_export_loads_for_inference(tiny_dataset):
-    trainer = Trainer(tiny_dataset)
+def test_export_loads_for_inference(tiny_corpus):
+    trainer = Trainer(tiny_corpus)
     trainer.fit()
     path = trainer.checkpoints.export_model()
     predictor = load_predictor(path, device="cpu")
-    assert predictor.predict(2, 3).expected == 5
-    assert path.stat().st_size < (tiny_dataset.checkpoint_dir / "best.pt").stat().st_size
+    assert predictor.predict_sum(2, 3).expected == "5"
+    assert path.stat().st_size < (tiny_corpus.checkpoint_dir / "best.pt").stat().st_size
 
 
 def test_language_model_checkpoints_carry_the_tokenizer(tiny_corpus):
@@ -432,10 +434,10 @@ def test_train_flags_become_checkpoint_settings():
         main(["--resume-live", "--init-from", "x.pt"])
 
 
-def test_init_from_starts_a_new_run_from_another_checkpoint(tiny_dataset, tmp_path):
-    donor = Trainer(fresh(tiny_dataset, tmp_path / "donor"))
+def test_init_from_starts_a_new_run_from_another_checkpoint(tiny_corpus, tmp_path):
+    donor = Trainer(fresh(tiny_corpus, tmp_path / "donor"))
     donor.fit()
-    cfg = fresh(tiny_dataset, tmp_path / "new")
+    cfg = fresh(tiny_corpus, tmp_path / "new")
     cfg.training.resume = str(donor.checkpoints.path("best"))
     started = Trainer(cfg)
     assert_same_weights(params(started.model), load_checkpoint(donor.checkpoints.path("best"))["model_state_dict"])
@@ -445,14 +447,14 @@ def test_init_from_starts_a_new_run_from_another_checkpoint(tiny_dataset, tmp_pa
     assert started.history[0]["epoch"] == 1
 
 
-def test_save_a_better_file_as_best_keeps_the_old_best_in_history(tiny_dataset, tmp_path):
+def test_save_a_better_file_as_best_keeps_the_old_best_in_history(tiny_corpus, tmp_path):
     from ored.training.checkpoints import evaluate_file, place_checkpoint
 
-    short = fresh(tiny_dataset, tmp_path / "short")
+    short = fresh(tiny_corpus, tmp_path / "short")
     short.training.epochs = 1
     Trainer(short).fit()
-    long = fresh(tiny_dataset, tmp_path / "long")
-    long.training.epochs = 20
+    long = fresh(tiny_corpus, tmp_path / "long")
+    long.training.epochs = 4
     Trainer(long).fit()
     old_best = load_checkpoint(short.checkpoint_dir / "best.pt")
 
@@ -469,39 +471,39 @@ def test_save_a_better_file_as_best_keeps_the_old_best_in_history(tiny_dataset, 
     assert_same_weights(load_checkpoint(archived[0])["model_state_dict"], old_best["model_state_dict"])
 
 
-def test_save_a_worse_file_as_best_changes_nothing(tiny_dataset, tmp_path):
+def test_save_a_worse_file_as_best_changes_nothing(tiny_corpus, tmp_path):
     from ored.training.checkpoints import place_checkpoint
 
-    tiny_dataset.training.epochs = 20
-    Trainer(tiny_dataset).fit()
-    before = (tiny_dataset.checkpoint_dir / "best.pt").read_bytes()
+    tiny_corpus.training.epochs = 4
+    Trainer(tiny_corpus).fit()
+    before = (tiny_corpus.checkpoint_dir / "best.pt").read_bytes()
 
-    path, message = place_checkpoint(tiny_dataset, tiny_dataset.checkpoint_dir / "base.pt", "best", device="cpu")
+    path, message = place_checkpoint(tiny_corpus, tiny_corpus.checkpoint_dir / "base.pt", "best", device="cpu")
 
     assert path is None and "not promoted" in message
-    assert (tiny_dataset.checkpoint_dir / "best.pt").read_bytes() == before
-    assert not (tiny_dataset.checkpoint_dir / "history").exists()
+    assert (tiny_corpus.checkpoint_dir / "best.pt").read_bytes() == before
+    assert not (tiny_corpus.checkpoint_dir / "history").exists()
 
-    path, _ = place_checkpoint(tiny_dataset, tiny_dataset.checkpoint_dir / "base.pt", "best",
+    path, _ = place_checkpoint(tiny_corpus, tiny_corpus.checkpoint_dir / "base.pt", "best",
                                force=True, device="cpu")
     assert load_checkpoint(path)["epoch"] == 0
 
 
-def test_save_as_history_and_live(tiny_dataset):
+def test_save_as_history_and_live(tiny_corpus):
     from ored.training.checkpoints import place_checkpoint
 
-    Trainer(tiny_dataset).fit()
-    d = tiny_dataset.checkpoint_dir
-    first, _ = place_checkpoint(tiny_dataset, d / "best.pt", "history")
-    second, _ = place_checkpoint(tiny_dataset, d / "best.pt", "history")
+    Trainer(tiny_corpus).fit()
+    d = tiny_corpus.checkpoint_dir
+    first, _ = place_checkpoint(tiny_corpus, d / "best.pt", "history")
+    second, _ = place_checkpoint(tiny_corpus, d / "best.pt", "history")
     assert first != second and second.stem.endswith("-2")
     assert load_checkpoint(second)["checkpoint_kind"] == "history"
 
-    live, message = place_checkpoint(tiny_dataset, d / "best.pt", "live")
+    live, message = place_checkpoint(tiny_corpus, d / "best.pt", "live")
     assert load_checkpoint(live)["checkpoint_kind"] == "live" and "previous live kept" in message
 
     with pytest.raises(CheckpointError, match="--init-from"):
-        place_checkpoint(tiny_dataset, d / "base.pt", "live")
+        place_checkpoint(tiny_corpus, d / "base.pt", "live")
 
 
 def test_merge_live_from_an_online_session(tiny_corpus, tmp_path, capsys):

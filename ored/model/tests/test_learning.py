@@ -243,15 +243,15 @@ def test_dataset_specs_are_read_from_the_store(store):
     from ored.learning import Dataset
 
     store.add_dataset(Dataset(
-        name='bit_addition',
+        name='arithmetic',
         kind='tabular',
-        generator='scripts/generate_dataset.py',
+        generator='scripts/generate_corpus.py',
         spec={'rows': 256},
         samples=[{'split': 'train'}],
     ))
     store.add_dataset(Dataset(name='char_corpus', kind='text'))
 
-    assert [d.name for d in store.datasets()] == ['bit_addition', 'char_corpus']
+    assert [d.name for d in store.datasets()] == ['arithmetic', 'char_corpus']
 
     only = store.datasets('char_corpus')
     assert len(only) == 1 and only[0].kind == 'text'
@@ -262,7 +262,7 @@ def test_dataset_specs_are_read_from_the_store(store):
 def test_a_dataset_carries_its_spec_not_a_file_path_alone(store):
     from ored.learning import Dataset
 
-    store.add_dataset(Dataset(name='bit_addition', spec={'rows': 256}, samples=[{'a': 0}]))
-    found = store.datasets('bit_addition')[0]
+    store.add_dataset(Dataset(name='arithmetic', spec={'rows': 256}, samples=[{'a': 0}]))
+    found = store.datasets('arithmetic')[0]
     assert found.spec['rows'] == 256
     assert found.samples

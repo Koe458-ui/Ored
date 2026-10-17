@@ -27,18 +27,6 @@ from ored.utils.weight_stats import (
 logger = get_logger(__name__)
 
 
-def build_criterion(name: str) -> nn.Module:
-    losses = {
-        "bce_with_logits": nn.BCEWithLogitsLoss,
-        "mse": nn.MSELoss,
-        "cross_entropy": nn.CrossEntropyLoss,
-    }
-    key = name.lower()
-    if key not in losses:
-        raise ValueError(f"unknown loss {name!r}; available: {sorted(losses)}")
-    return losses[key]()
-
-
 def build_optimizer(name: str, model: nn.Module, lr: float, weight_decay: float) -> torch.optim.Optimizer:
     optimizers = {
         "adam": torch.optim.Adam,
@@ -59,8 +47,6 @@ def _format_metric(name: str, value: float) -> str:
 
 def _legend(metric_names: List[str]) -> str:
     known = {
-        "bit_acc": "bit-acc = individual output bits correct",
-        "exact_acc": "exact-acc = every bit correct (the real score)",
         "bpc": "bpc = bits per character of text (lower is better)",
         "ppl": "ppl = perplexity, how many tokens it is still choosing between",
     }
@@ -69,17 +55,11 @@ def _legend(metric_names: List[str]) -> str:
 
 
 def _describe_architecture(description: Dict[str, Any]) -> str:
-    if description["type"] == "MLP":
-        hidden = " -> ".join(str(h) for h in description["hidden_sizes"])
-        return (f"MLP {description['input_size']} -> {hidden} -> "
-                f"{description['output_size']} ({description['activation']})")
     if description["type"] == "Transformer":
         return (f"Transformer {description['n_layer']} layers x "
                 f"{description['n_head']} heads, d_model {description['d_model']}, "
                 f"d_ff {description['d_ff']}, block {description['block_size']}, "
                 f"vocab {description['vocab_size']}")
-    if description["type"] == "BigramLanguageModel":
-        return f"Bigram lookup table, vocab {description['vocab_size']} (baseline)"
     return str(description)
 
 
@@ -545,11 +525,7 @@ def train(cfg: Config, ensure_dataset: bool = True) -> Dict[str, Any]:
         logger.info("data.source is generated: this run does NOT read ored_training_data "
                     "(remove --generated-corpus / data.source=generated to train on Supabase data)")
     if ensure_dataset:
-        if cfg.task == "bit_addition" and not Path(cfg.data.raw_path).exists():
-            from ored.data.generate import generate_dataset
-            logger.info("dataset missing -- generating it first")
-            generate_dataset(cfg)
-        elif cfg.task == "language_model" and not (Path(cfg.data.corpus.dir) / "train.txt").exists():
+        if not (Path(cfg.data.corpus.dir) / "train.txt").exists():
             from ored.data.corpus import generate_corpus
             logger.info("corpus missing -- generating it first")
             generate_corpus(cfg)
@@ -638,7 +614,7 @@ def apply_dataset_arguments(cfg: Config, args: argparse.Namespace, overrides: Li
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Train an Ored.ai model.")
-    parser.add_argument("--config", default="configs/bit_adder_mlp.yaml")
+    parser.add_argument("--config", default="configs/ored50m.yaml")
     parser.add_argument("--set", dest="overrides", action="append", default=[],
                         metavar="KEY=VALUE", help="override a config value (repeatable)")
     start = parser.add_mutually_exclusive_group()

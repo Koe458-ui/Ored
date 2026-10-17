@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
 import torch
 
 from ored.config import Config, config_from_dict
-from ored.data.preprocessing import bits_to_string, decode_prediction, encode_pair
 from ored.data.tokenizer import Tokenizer
 from ored.inference.generator import complete, generate_text
 from ored.models.registry import build_model
@@ -18,9 +17,7 @@ from ored.utils.seed import resolve_device
 
 logger = get_logger(__name__)
 
-DEFAULT_CHECKPOINT = "checkpoints/bit_adder_mlp/best.pt"
-
-LM_CHECKPOINT = "checkpoints/char_transformer/best.pt"
+DEFAULT_CHECKPOINT = "checkpoints/char_transformer/best.pt"
 
 PREDICTOR_REGISTRY: Dict[str, Type["BasePredictor"]] = {}
 
@@ -37,7 +34,7 @@ def register_predictor(task: str):
     return decorator
 
 
-TEXT_MODELS = frozenset({"transformer", "bigram"})
+TEXT_MODELS = frozenset({"transformer"})
 
 
 def find_tokenizer_data(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -75,36 +72,6 @@ def resolve_task(payload: Dict[str, Any], cfg: Config, path: str | Path) -> str:
         f"{path} was trained for task {cfg.task!r}, which has no predictor. "
         f"Known tasks: {sorted(PREDICTOR_REGISTRY)}"
     )
-
-
-@dataclass
-class Prediction:
-
-    a: int
-    b: int
-    predicted: int
-    predicted_bits: List[int]
-    probabilities: List[float]
-    expected: Optional[int] = None
-
-    @property
-    def correct(self) -> Optional[bool]:
-        if self.expected is None:
-            return None
-        return self.predicted == self.expected
-
-    @property
-    def confidence(self) -> float:
-        return min(max(p, 1.0 - p) for p in self.probabilities)
-
-    def format(self) -> str:
-        arrow = f"{self.a:>3} + {self.b:<3} = {self.predicted:<3}"
-        bits = f"bits {bits_to_string(self.predicted_bits)}"
-        conf = f"confidence {self.confidence:.1%}"
-        if self.expected is None:
-            return f"{arrow}  ({bits}, {conf})"
-        mark = "OK  " if self.correct else "WRONG"
-        return f"{arrow}  [{mark}] expected {self.expected:<3} ({bits}, {conf})"
 
 
 @dataclass
@@ -196,49 +163,6 @@ class BasePredictor:
         return self._describe_header()
 
 
-@register_predictor("bit_addition")
-class Predictor(BasePredictor):
-
-    def __init__(self, model: torch.nn.Module, cfg: Config, device: torch.device,
-                 checkpoint_info: Dict[str, Any]) -> None:
-        super().__init__(model, cfg, device, checkpoint_info)
-        self.n_bits = cfg.data.n_bits
-
-    @classmethod
-    def _build(cls, payload, cfg, device, info):
-        model = build_model(cfg).to(device)
-        check_compatible(payload, model, path=info["path"])
-        load_model_state(model, payload["model_state_dict"], info["path"])
-        return cls(model, cfg, device, info)
-
-    @torch.no_grad()
-    def predict(self, a: int, b: int) -> Prediction:
-        limit = 2**self.n_bits - 1
-        for name, value in (("a", a), ("b", b)):
-            if not 0 <= value <= limit:
-                raise ValueError(
-                    f"{name}={value} is out of range: this model was trained on "
-                    f"{self.n_bits}-bit inputs, so both numbers must be in 0..{limit}."
-                )
-
-        x = torch.from_numpy(encode_pair(a, b, self.n_bits)).to(self.device)
-
-        logits = self.model(x.unsqueeze(0))[0]
-
-        value, bits, probabilities = decode_prediction(logits, self.n_bits)
-        return Prediction(
-            a=a,
-            b=b,
-            predicted=value,
-            predicted_bits=bits,
-            probabilities=probabilities,
-            expected=a + b,
-        )
-
-    def predict_many(self, pairs: Sequence[Tuple[int, int]]) -> List[Prediction]:
-        return [self.predict(a, b) for a, b in pairs]
-
-
 @register_predictor("language_model")
 class LanguageModelPredictor(BasePredictor):
 
@@ -316,12 +240,7 @@ class LanguageModelPredictor(BasePredictor):
 
 
 def resolve_checkpoint(path: str | Path | None = None) -> str:
-    if path is not None:
-        return str(path)
-    if not Path(DEFAULT_CHECKPOINT).exists() and Path(LM_CHECKPOINT).exists():
-        logger.info(f"(no {DEFAULT_CHECKPOINT} -- using {LM_CHECKPOINT})")
-        return LM_CHECKPOINT
-    return DEFAULT_CHECKPOINT
+    return str(path) if path is not None else DEFAULT_CHECKPOINT
 
 
 def load_predictor(path: str | Path | None = None, device: str = "auto") -> BasePredictor:
@@ -336,45 +255,6 @@ def _parse_pairs(tokens: Sequence[str]) -> List[Tuple[int, int]]:
         left, right = token.split("+", 1)
         pairs.append((int(left), int(right)))
     return pairs
-
-
-def _run_bit_addition(predictor: Predictor, args: argparse.Namespace) -> int:
-    pairs: List[Tuple[int, int]] = []
-    if args.a is not None and args.b is not None:
-        pairs.append((args.a, args.b))
-    pairs.extend(_parse_pairs(args.pairs or []))
-
-    if not pairs and not args.interactive:
-        pairs = [(0, 0), (1, 1), (3, 4), (9, 6), (7, 8), (15, 15)]
-        if not args.quiet:
-            logger.info("(no pair given -- showing a default sample)")
-
-    for a, b in pairs:
-        try:
-            logger.info(predictor.predict(a, b).format())
-        except ValueError as exc:
-            logger.info(f"skipped {a}+{b}: {exc}")
-
-    if args.interactive:
-        logger.info("\nEnter pairs like '9 6' or '9+6'. Type 'q' to quit.")
-        while True:
-            try:
-                raw = input("> ").strip()
-            except (EOFError, KeyboardInterrupt):
-                logger.info("")
-                break
-            if raw.lower() in ("q", "quit", "exit"):
-                break
-            if not raw:
-                continue
-            try:
-                parts = raw.replace("+", " ").split()
-                a, b = int(parts[0]), int(parts[1])
-                logger.info(predictor.predict(a, b).format())
-            except (ValueError, IndexError) as exc:
-                logger.info(f"could not read that: {exc}")
-
-    return 0
 
 
 def _run_language_model(predictor: LanguageModelPredictor, args: argparse.Namespace) -> int:
@@ -444,16 +324,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run inference with a trained Ored.ai model.",
         epilog="Examples:\n"
-               "  python scripts/infer.py --a 9 --b 6\n"
+               '  python scripts/infer.py --text \"17 + 9 = \"\n'
                "  python scripts/infer.py --pairs 1+1 7+8 15+15\n"
-               "  python scripts/infer.py --checkpoint checkpoints/char_transformer/best.pt \\\n"
-               '      --text \"17 + 9 = \"\n'
+               '  python scripts/infer.py --ask \"What is a planet?\"\n'
                "  python scripts/infer.py --interactive",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--checkpoint", default=None,
-                        help=f"default: {DEFAULT_CHECKPOINT}, "
-                             f"or {LM_CHECKPOINT} when that is the only one present")
+                        help=f"default: {DEFAULT_CHECKPOINT}")
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--a", type=int, help="first number")
     parser.add_argument("--b", type=int, help="second number")
@@ -485,9 +363,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info(predictor.describe())
         logger.info("")
 
-    if isinstance(predictor, LanguageModelPredictor):
-        return _run_language_model(predictor, args)
-    return _run_bit_addition(predictor, args)
+    return _run_language_model(predictor, args)
 
 
 if __name__ == "__main__":

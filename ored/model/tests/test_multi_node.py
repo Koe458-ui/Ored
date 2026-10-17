@@ -29,9 +29,9 @@ def launch_nodes(nodes, command, config, session, extra=(), sets=()):
     return [agent.returncode for agent in agents], "\n".join(outputs)
 
 
-def test_three_nodes_find_each_other_train_and_resume_on_two(tiny_dataset, tmp_path):
+def test_three_nodes_find_each_other_train_and_resume_on_two(tiny_corpus, tmp_path):
     config = tmp_path / "run.yaml"
-    config.write_text(yaml.safe_dump(tiny_dataset.to_dict()))
+    config.write_text(yaml.safe_dump(tiny_corpus.to_dict()))
     ck = tmp_path / "ck"
 
     codes, out = launch_nodes(3, "test", config, "pytest-mn-test")
@@ -44,7 +44,7 @@ def test_three_nodes_find_each_other_train_and_resume_on_two(tiny_dataset, tmp_p
     assert codes == [0, 0, 0], out
     assert "3 workers on 3 node(s)" in out
 
-    run = ck / tiny_dataset.run_name
+    run = ck / tiny_corpus.run_name
     live = json.loads((run / "live.json").read_text())
     assert live["world_size"] == 3 and live["epoch"] == 3
 

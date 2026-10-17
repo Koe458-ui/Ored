@@ -110,7 +110,7 @@ it by {eps}, measure again; divide the difference by the distance:
 
 They agree. The gradient really is just "the slope of the loss with respect to
 this weight". (We do not train this way -- it would need two forward passes per
-weight, so 3,018 passes for our 1,509-parameter MLP instead of one backward
+weight, so 3,018 passes for a 1,509-parameter network instead of one backward
 pass.)""")
 
     logger.info(section("7. THE WEIGHT UPDATE"))

@@ -124,10 +124,7 @@ def ensure_data(cfg: Config, env: DistEnv) -> Any:
     if cfg.data.source == "supabase":
         return ensure_snapshot(cfg, env)
     if env.local_rank == 0:
-        if cfg.task == "bit_addition" and not Path(cfg.data.raw_path).exists():
-            from ored.data.generate import generate_dataset
-            generate_dataset(cfg)
-        elif cfg.task == "language_model" and not (Path(cfg.data.corpus.dir) / "train.txt").exists():
+        if not (Path(cfg.data.corpus.dir) / "train.txt").exists():
             from ored.data.corpus import generate_corpus
             generate_corpus(cfg)
     env.barrier()
@@ -161,7 +158,7 @@ def run_training(cfg: Config, env: DistEnv, remote: Any = None, control: Any = N
         cfg.training.resume = "live" if env.restart_count > 0 else ""
     try:
         prepared = ensure_data(cfg, env)
-        dataset_tag = f"{cfg.task}:{cfg.data.corpus.dir if cfg.task == 'language_model' else cfg.data.raw_path}"
+        dataset_tag = f"{cfg.task}:{cfg.data.corpus.dir}"
         if cfg.data.source == "supabase":
             dataset_tag = cfg.data.supabase.dataset_tag
         control.start(cfg.run_name, dataset_tag, session_config(cfg, env, per_worker_batch_size(cfg, env.world_size)))

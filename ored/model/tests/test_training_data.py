@@ -409,9 +409,8 @@ def test_train_command_line_selects_supabase(remote, cfg, monkeypatch, tmp_path)
 
 
 def test_the_shipped_configs_train_on_supabase_by_default():
-    for path in (CONFIG, CONFIG.parents[2] / "configs" / "char_bigram.yaml"):
-        cfg = load_config(path)
-        assert cfg.data.source == "supabase" and cfg.data.supabase.dataset_tag == "all"
+    cfg = load_config(CONFIG)
+    assert cfg.data.source == "supabase" and cfg.data.supabase.dataset_tag == "all"
 
 
 def test_training_data_commands(remote, cfg, tmp_path, caplog):
@@ -505,8 +504,7 @@ def test_supabase_source_needs_a_tag_and_the_language_model():
     with pytest.raises(ValueError, match="dataset_tag"):
         load_config(CONFIG, overrides=["data.source=supabase", "data.supabase.dataset_tag="])
     with pytest.raises(ValueError, match="language_model"):
-        load_config(CONFIG.parents[2] / "configs" / "bit_adder_mlp.yaml",
-                    overrides=["data.source=supabase", "data.supabase.dataset_tag=all"])
+        load_config(CONFIG, overrides=["task=bit_addition"])
     with pytest.raises(StoreError):
         InMemoryStore().update_training_data("nope", verified=True)
 

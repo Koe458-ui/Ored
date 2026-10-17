@@ -11,36 +11,9 @@ if str(SRC) not in sys.path:
 
 from ored.config import load_config
 from ored.data.corpus import generate_corpus
-from ored.data.generate import generate_dataset
 
 CONFIGS = Path(__file__).resolve().parent.parent / "configs"
-CONFIG_PATH = CONFIGS / "bit_adder_mlp.yaml"
 LM_CONFIG_PATH = Path(__file__).resolve().parent / "configs" / "language_model.yaml"
-
-
-@pytest.fixture()
-def tiny_cfg(tmp_path):
-    cfg = load_config(
-        CONFIG_PATH,
-        overrides=[
-            "data.n_bits=3",
-            "training.epochs=5",
-            "training.log_every=100",
-            "training.early_stopping_patience=0",
-            "data.batch_size=8",
-            "training.device=cpu",
-        ],
-    )
-    cfg.data.raw_path = str(tmp_path / "data" / "bit_addition.csv")
-    cfg.paths.checkpoint_dir = str(tmp_path / "checkpoints")
-    cfg.run_name = "pytest_run"
-    return cfg
-
-
-@pytest.fixture()
-def tiny_dataset(tiny_cfg):
-    generate_dataset(tiny_cfg)
-    return tiny_cfg
 
 
 @pytest.fixture()

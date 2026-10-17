@@ -6,19 +6,6 @@ from typing import Dict
 import torch
 
 
-@torch.no_grad()
-def bit_accuracy(logits: torch.Tensor, targets: torch.Tensor) -> float:
-    predicted = (logits > 0).float()
-    return (predicted == targets).float().mean().item()
-
-
-@torch.no_grad()
-def exact_match_accuracy(logits: torch.Tensor, targets: torch.Tensor) -> float:
-    predicted = (logits > 0).float()
-    correct_rows = (predicted == targets).all(dim=1)
-    return correct_rows.float().mean().item()
-
-
 @dataclass
 class MetricAccumulator:
 

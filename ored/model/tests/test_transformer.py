@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 import torch
 
-from ored.models.bigram import BigramLanguageModel
 from ored.models.transformer import CausalSelfAttention, Transformer
 
 
@@ -133,15 +132,3 @@ def test_dropout_only_applies_in_training_mode():
     second = m(ids)
     assert not torch.allclose(first, second)
 
-
-def test_bigram_ignores_context():
-    m = BigramLanguageModel(vocab_size=10)
-    with torch.no_grad():
-        a = m(torch.tensor([[3, 7]]))[0, -1]
-        b = m(torch.tensor([[5, 7]]))[0, -1]
-    assert torch.allclose(a, b)
-
-
-def test_bigram_output_shape():
-    m = BigramLanguageModel(vocab_size=10)
-    assert m(torch.randint(0, 10, (2, 6))).shape == (2, 6, 10)

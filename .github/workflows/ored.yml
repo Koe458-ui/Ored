@@ -40,9 +40,11 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-      - name: Smoke-test the Step 1 pipeline end to end
+      - name: Smoke-test the Transformer pipeline end to end
         run: |
-          python scripts/generate_dataset.py
-          python scripts/train.py --set training.epochs=20 --set run_name=ci_smoke
-          python scripts/evaluate.py --checkpoint checkpoints/ci_smoke/best.pt --show-errors 0
-          python scripts/infer.py --checkpoint checkpoints/ci_smoke/best.pt --a 9 --b 6 --quiet
+          C=tests/configs/language_model.yaml
+          SMALL="--set data.source=generated --set data.corpus.dir=data/raw/ci_corpus --set data.corpus.sentence_lines=300 --set data.corpus.max_operand=9 --set data.corpus.arithmetic_repeats=3 --set data.block_size=32 --set data.stride=16 --set data.batch_size=8 --set model.d_model=32 --set model.n_layer=2 --set model.n_head=2 --set model.d_ff=64 --set training.device=cpu"
+          python scripts/generate_corpus.py --config $C $SMALL
+          python scripts/train.py --config $C --generated-corpus $SMALL --set training.epochs=2 --run-name ci_smoke
+          python scripts/evaluate.py --checkpoint checkpoints/ci_smoke/best.pt --device cpu --samples 1
+          python scripts/infer.py --checkpoint checkpoints/ci_smoke/best.pt --device cpu --text "9 + 6 = " --quiet

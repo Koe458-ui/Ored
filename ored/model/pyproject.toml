@@ -21,7 +21,6 @@ dev = ["pytest>=8.0"]
 corpus = ["zstandard>=0.22,<1.0"]
 
 [project.scripts]
-ored-generate-dataset = "ored.data.generate:main"
 ored-generate-corpus = "ored.data.corpus:main"
 ored-train = "ored.training.trainer:main"
 ored-evaluate = "ored.evaluation.evaluator:main"

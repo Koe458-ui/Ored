@@ -3,25 +3,23 @@ from __future__ import annotations
 import pytest
 import torch
 
-from ored.training.tasks import TASK_REGISTRY, BitAdditionTask, LanguageModelTask, build_task
+from ored.training.tasks import TASK_REGISTRY, LanguageModelTask, build_task
 from ored.training.trainer import Trainer
 from ored.utils.checkpoint import load_checkpoint
 from ored.utils.weight_stats import snapshot_parameters, summarise_weight_change
 
 
-def test_both_tasks_are_registered():
-    assert "bit_addition" in TASK_REGISTRY
-    assert "language_model" in TASK_REGISTRY
+def test_only_the_language_model_task_is_registered():
+    assert sorted(TASK_REGISTRY) == ["language_model"]
 
 
-def test_unknown_task_is_rejected(tiny_cfg):
-    tiny_cfg.task = "telepathy"
+def test_unknown_task_is_rejected(tiny_lm_cfg):
+    tiny_lm_cfg.task = "telepathy"
     with pytest.raises(ValueError, match="unknown task"):
-        build_task(tiny_cfg)
+        build_task(tiny_lm_cfg)
 
 
-def test_the_right_task_is_built(tiny_cfg, tiny_lm_cfg):
-    assert isinstance(build_task(tiny_cfg), BitAdditionTask)
+def test_the_right_task_is_built(tiny_lm_cfg):
     assert isinstance(build_task(tiny_lm_cfg), LanguageModelTask)
 
 
@@ -115,9 +113,3 @@ def test_scheduler_changes_the_learning_rate(tiny_corpus):
     assert any(r != tiny_corpus.training.learning_rate for r in rates), \
         "the learning rate never moved despite a cosine schedule"
 
-
-def test_bigram_baseline_trains_too(tiny_corpus):
-    tiny_corpus.model.name = "bigram"
-    trainer = Trainer(tiny_corpus)
-    result = trainer.fit()
-    assert result["history"][-1]["train_loss"] < result["history"][0]["train_loss"]

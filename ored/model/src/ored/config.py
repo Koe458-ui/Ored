@@ -117,9 +117,6 @@ class DataConfig:
     batch_size: int = 16
     shuffle_train: bool = True
 
-    n_bits: int = 4
-    raw_path: str = "data/raw/bit_addition.csv"
-
     corpus: CorpusConfig = field(default_factory=CorpusConfig)
 
     block_size: int = 128
@@ -153,8 +150,6 @@ class DataConfig:
             raise ValueError("data.num_workers must be >= 0")
         if self.prefetch_factor < 1:
             raise ValueError("data.prefetch_factor must be >= 1")
-        if self.n_bits < 1:
-            raise ValueError("data.n_bits must be >= 1")
         if self.batch_size < 1:
             raise ValueError("data.batch_size must be >= 1")
         if self.block_size < 2:
@@ -166,23 +161,12 @@ class DataConfig:
         self.split.validate()
         self.corpus.validate()
 
-    @property
-    def input_size(self) -> int:
-        return 2 * self.n_bits
-
-    @property
-    def output_size(self) -> int:
-        return self.n_bits + 1
-
 
 @dataclass
 class ModelConfig:
-    name: str = "mlp"
+    name: str = "transformer"
 
     dropout: float = 0.0
-
-    hidden_sizes: List[int] = field(default_factory=lambda: [32, 32])
-    activation: str = "relu"
 
     d_model: int = 128
     n_layer: int = 4
@@ -207,25 +191,16 @@ class ModelConfig:
         if self.expected_parameters < 0:
             raise ValueError("model.expected_parameters must be >= 0 (0 = not checked)")
 
-        if self.name.lower() == "mlp":
-            if not self.hidden_sizes:
-                raise ValueError(
-                    "model.hidden_sizes must contain at least one layer -- with no "
-                    "hidden layer the network is a single linear map and cannot "
-                    "learn carry propagation."
-                )
-            if any(h < 1 for h in self.hidden_sizes):
-                raise ValueError("every entry of model.hidden_sizes must be >= 1")
-
-        if self.name.lower() == "transformer":
-            if self.d_model < 1 or self.n_layer < 1 or self.n_head < 1:
-                raise ValueError("transformer d_model / n_layer / n_head must be >= 1")
-            if self.d_model % self.n_head != 0:
-                raise ValueError(
-                    f"model.d_model ({self.d_model}) must divide evenly into "
-                    f"model.n_head ({self.n_head}): each head gets d_model/n_head "
-                    f"dimensions to work in."
-                )
+        if self.name.lower() != "transformer":
+            raise ValueError(f"model.name must be transformer, got {self.name!r}")
+        if self.d_model < 1 or self.n_layer < 1 or self.n_head < 1:
+            raise ValueError("transformer d_model / n_layer / n_head must be >= 1")
+        if self.d_model % self.n_head != 0:
+            raise ValueError(
+                f"model.d_model ({self.d_model}) must divide evenly into "
+                f"model.n_head ({self.n_head}): each head gets d_model/n_head "
+                f"dimensions to work in."
+            )
 
 
 PRECISIONS = ("fp32", "auto", "bf16", "fp16")
@@ -237,7 +212,7 @@ class TrainingConfig:
     learning_rate: float = 0.01
     optimizer: str = "adam"
     weight_decay: float = 0.0
-    loss: str = "bce_with_logits"
+    loss: str = "cross_entropy"
     grad_clip: float = 1.0
     early_stopping_patience: int = 40
     log_every: int = 10
@@ -409,9 +384,9 @@ class PathsConfig:
 @dataclass
 class Config:
 
-    run_name: str = "bit_adder_mlp"
+    run_name: str = "ored"
 
-    task: str = "bit_addition"
+    task: str = "language_model"
 
     seed: int = 1337
     deterministic: bool = True
@@ -424,10 +399,8 @@ class Config:
     paths: PathsConfig = field(default_factory=PathsConfig)
 
     def validate(self) -> "Config":
-        if self.data.source == "supabase" and self.task != "language_model":
-            raise ValueError("data.source: supabase feeds the language_model task only")
-        if self.data.source == "tokens" and self.task != "language_model":
-            raise ValueError("data.source: tokens feeds the language_model task only")
+        if self.task != "language_model":
+            raise ValueError(f"task must be language_model, got {self.task!r}")
         if self.checkpoint.policy == "best_only" and self.data.source != "tokens":
             raise ValueError(f"this config (checkpoint.policy: best_only, e.g. ored50m) trains only on token "
                              f"shards from R2 (data.source: tokens), not on data.source: {self.data.source}")
@@ -540,5 +513,14 @@ def load_config(
     return cfg.validate()
 
 
+RETIRED_KEYS = {"data": ("n_bits", "raw_path"), "model": ("hidden_sizes", "activation")}
+
+
 def config_from_dict(data: Dict[str, Any]) -> Config:
-    return _from_dict(Config, copy.deepcopy(data)).validate()
+    data = copy.deepcopy(data)
+    if str((data.get("model") or {}).get("name", "")).lower() == "transformer":
+        data["task"] = "language_model"
+    for section, keys in RETIRED_KEYS.items():
+        for key in keys:
+            (data.get(section) or {}).pop(key, None)
+    return _from_dict(Config, data).validate()

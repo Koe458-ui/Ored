@@ -22,8 +22,6 @@ def register_model(name: str) -> Callable[[Type[nn.Module]], Type[nn.Module]]:
 
 
 def _import_all_models() -> None:
-    from ored.models import bigram as _bigram
-    from ored.models import mlp as _mlp
     from ored.models import transformer as _tf
 
 

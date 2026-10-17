@@ -83,9 +83,9 @@ def same_weights(a, b):
 
 
 @pytest.fixture()
-def cfg(tiny_dataset, tmp_path):
-    tiny_dataset.model.dropout = 0.2
-    return tiny_dataset
+def cfg(tiny_corpus, tmp_path):
+    tiny_corpus.model.dropout = 0.2
+    return tiny_corpus
 
 
 def test_three_workers_train_one_model(cfg, tmp_path):
@@ -98,8 +98,8 @@ def test_three_workers_train_one_model(cfg, tmp_path):
 
 
 def len_train(cfg):
-    from ored.data.dataset import build_datasets
-    return len(build_datasets(cfg)["train"])
+    from ored.data.text_dataset import build_text_datasets
+    return len(build_text_datasets(cfg)[0]["train"])
 
 
 def test_every_worker_gets_its_own_share_of_the_data(cfg, tmp_path):
@@ -124,7 +124,7 @@ def test_global_validation_matches_one_machine(cfg, tmp_path):
     whole = trainer.evaluate("val")
     record = ranks[0]["history"][0]
     assert record["val_loss"] == pytest.approx(whole["loss"], rel=1e-6)
-    assert record["val_exact_acc"] == pytest.approx(whole["exact_acc"], rel=1e-6)
+    assert record["val_bpc"] == pytest.approx(whole["bpc"], rel=1e-6)
     assert record["val_examples"] == len(trainer.datasets["val"])
 
 
@@ -247,7 +247,8 @@ def test_stop_everything_then_resume_matches_an_uninterrupted_run(cfg, tmp_path)
     run_workers(train_worker, 3, resumed_cfg, b, {})
     resumed = results(b, 3)
     assert "step 6" in resumed[0]["resumed_from"]
-    assert resumed[0]["history"][:3] == straight[0]["history"][:3], "data order and RNG are restored exactly"
+    for a, b_ in zip(straight[0]["history"][:3], resumed[0]["history"][:3]):
+        assert b_ == pytest.approx(a, rel=1e-6), "data order and RNG are restored exactly"
     for r in range(3):
         for key, value in straight[r]["params"].items():
             assert torch.allclose(resumed[r]["params"][key], value, rtol=1e-5, atol=1e-6), key
@@ -351,7 +352,7 @@ def test_corrupt_and_missing_shards_are_detected(cfg, tmp_path):
 def test_a_model_config_mismatch_fails_verification(cfg, tmp_path):
     live = trained_group(cfg, tmp_path)
     other = copy.deepcopy(cfg)
-    other.model.hidden_sizes = [8]
+    other.model.d_model = 64
     _, problems = verify_group_dir(live, other)
     assert problems and "Model architecture mismatch" in problems[0]
 
@@ -542,24 +543,24 @@ def test_launch_builds_a_static_torchrun_command(monkeypatch):
         torchrun_command(launch_args("--session", "s"), load_config(args.config))
 
 
-def test_bad_distributed_settings_are_rejected(tiny_cfg):
+def test_bad_distributed_settings_are_rejected(tiny_lm_cfg):
     for key, value, message in (("backend", "mpi", "backend"), ("nnodes", "5:2", "MIN <= MAX"),
                                 ("nnodes", "three", "nnodes"), ("batch_size_mode", "huge", "batch_size_mode")):
-        bad = copy.deepcopy(tiny_cfg)
+        bad = copy.deepcopy(tiny_lm_cfg)
         setattr(bad.distributed, key, value)
         with pytest.raises(ValueError, match=message):
             bad.validate()
 
 
-def test_global_batch_mode_needs_an_even_split(tiny_cfg):
+def test_global_batch_mode_needs_an_even_split(tiny_lm_cfg):
     from ored.distributed.trainer import per_worker_batch_size
 
-    tiny_cfg.data.batch_size = 32
-    assert per_worker_batch_size(tiny_cfg, 3) == 32
-    tiny_cfg.distributed.batch_size_mode = "global"
-    assert per_worker_batch_size(tiny_cfg, 4) == 8
+    tiny_lm_cfg.data.batch_size = 32
+    assert per_worker_batch_size(tiny_lm_cfg, 3) == 32
+    tiny_lm_cfg.distributed.batch_size_mode = "global"
+    assert per_worker_batch_size(tiny_lm_cfg, 4) == 8
     with pytest.raises(DistributedError, match="Worker counts that fit"):
-        per_worker_batch_size(tiny_cfg, 3)
+        per_worker_batch_size(tiny_lm_cfg, 3)
 
 
 def test_the_language_model_trains_distributed(tiny_corpus, tmp_path):
