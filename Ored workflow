@@ -1,16 +1,14 @@
 Ored (ARTIFICIAL INTELLIGENCE)
-A moderation ai that helps moderation image flow and answer questions related to art .
+A full-fledged AI that answers questions, solves problems and helps with everyday tasks.
 
-It is currently in training phase 
+It is currently in training phase
 
-flow chart 
+flow chart
 
 GitHub (ver 1 work flow )
 │
-├── Ored AI
-│   └── Public website
-│
-└── Ored-AI-Moderation
+└── Ored AI
+    ├── Public website
     ├── AI model
     ├── Training
     ├── Inference API
@@ -26,7 +24,7 @@ oredlab.com
 Ored AI backend
       │
       ▼
-AI Moderation API
+Ored Inference API
       │
       ▼
 AI Model
@@ -35,18 +33,18 @@ AI Model
 Admin
       │
       ▼
-Private Moderation Console
+Private Admin Console
 
 Ored AI in website workflow (ver 1)
-Ored AI user uploads image
+Ored AI user asks a question
         ↓
-Normal upload validation
+Normal input validation
         ↓
-AI moderation model
+Ored AI model
         ↓
-ALLOW / REVIEW / REJECT
+Answer returned to the user
         ↓
-Store image + moderation result
+Store conversation
         ↓
 Training dataset
         ↓
@@ -59,7 +57,7 @@ Evaluation
 Deploy only if it passes
 
 Train workflow (ver 1)
-Upload image
+Collect training data
      ↓
 Store it
      ↓
@@ -72,5 +70,4 @@ Test new model
 Deploy new version
 
 private URL
-oredlab.com
 oredlab.com
