@@ -41,7 +41,6 @@ best.pt.tmp-*
 .progress.json
 !data/raw/.gitkeep
 !data/processed/.gitkeep
-!data/README.md
 
 *.vocab.json
 
