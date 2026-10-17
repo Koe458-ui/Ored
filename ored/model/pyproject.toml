@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "ored"
 version = "0.1.0"
 description = "Ored.ai -- an AI built from scratch, no pretrained weights."
-readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [

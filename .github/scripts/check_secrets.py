@@ -29,7 +29,7 @@ FORBIDDEN_FILES = re.compile(
     r"(^|/)(\.env(\.[^/]*)?|\.dev\.vars|credentials\.json|secrets\.ya?ml|id_rsa|id_ed25519)$"
     r"|\.(pem|key|p12|pfx|jks)$")
 ALLOWED_FILES = re.compile(r"(^|/)\.env\.example$")
-SKIP = re.compile(r"(^|/)(public/js/vendor/|\.github/scripts/check_secrets\.py$)")
+SKIP = re.compile(r"(^|/)(\.github/scripts/check_secrets\.py$)")
 MAX_BYTES = 5 * 1024 * 1024
 
 

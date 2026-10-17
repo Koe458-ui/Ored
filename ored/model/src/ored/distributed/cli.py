@@ -33,7 +33,6 @@ then the config's distributed: section.
   verify ID|DIR      check a distributed checkpoint (VERIFIED / FAILED)
   consolidate DIR    turn a distributed checkpoint into one .pt for inference
 
-See docs/distributed-training.md.
 """
 
 
