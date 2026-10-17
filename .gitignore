@@ -17,3 +17,5 @@ package.json
 credentials.json
 secrets.yaml
 secrets.yml
+__pycache__/
+*.pyc
